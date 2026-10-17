@@ -18,7 +18,7 @@ const LUMI_API_BASE = /^https?:$/.test(window.location.protocol)
 let lumiToken = localStorage.getItem('lumi-jwt-token') || '';
 let isUserLoggedIn = localStorage.getItem('lumi-logged-in') === 'true';
 let lumiBackendConnected = false;
-let lumiActiveBackendSourceId = localStorage.getItem('lumi-backend-source-id') || '';
+let lumiActiveBackendSourceId = localStorage.getItem('lumi-backend-source-id') || 'dfed7ff0-c965-45d4-a24a-7b1277176256';
 let lumiActiveBackendConvId = localStorage.getItem('lumi-backend-conv-id') || '';
 let lumiActiveBackendDeckId = localStorage.getItem('lumi-backend-deck-id') || '';
 
@@ -349,8 +349,11 @@ changePage = function (d) {
   if (r) persist('lumi-source-page-' + r.id, readerPage);
 
   const iframe = document.getElementById('lumiPdfFrame');
-  if (iframe && r?.id && lumiDocMode === 'pdf') {
-    const baseSrc = `${LUMI_API_BASE}/sources/${r.id}/file`;
+  const isRealUUID = r?.id && /^[0-9a-f-]{36}$/i.test(r.id);
+  const realPdfId = isRealUUID ? r.id : (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null);
+
+  if (iframe && realPdfId && lumiDocMode === 'pdf') {
+    const baseSrc = `${LUMI_API_BASE}/sources/${realPdfId}/file`;
     iframe.src = `${baseSrc}#page=${readerPage}&zoom=page-width`;
     const pageNumEl = document.getElementById('pageNum');
     if (pageNumEl) pageNumEl.textContent = `Trang ${readerPage} / ${maxPage}`;
@@ -407,12 +410,30 @@ reader = function () {
   )}</div>`;
 
   let paperBodyHTML = '';
-  if (lumiDocMode === 'pdf' && r.id) {
-    const pdfUrl = `${LUMI_API_BASE}/sources/${r.id}/file#page=${readerPage}&zoom=page-width`;
+  const isRealUUID = r.id && /^[0-9a-f-]{36}$/i.test(r.id);
+  const realPdfId = isRealUUID ? r.id : (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null);
+
+  if (lumiDocMode === 'pdf' && realPdfId) {
+    const pdfUrl = `${LUMI_API_BASE}/sources/${realPdfId}/file#page=${readerPage}&zoom=page-width`;
     paperBodyHTML = `
       <div class="pdf-viewer-wrap" style="padding:10px;background:var(--surface2);border-radius:14px;box-sizing:border-box">
         <iframe id="lumiPdfFrame" src="${pdfUrl}" title="${esc(sourceTitle)}" style="width:100%;height:calc(100vh - 270px);min-height:700px;border:1px solid var(--border);border-radius:12px;background:#fff;display:block"></iframe>
       </div>
+    `;
+  } else if (lumiDocMode === 'pdf' && !realPdfId) {
+    paperBodyHTML = `
+      <article class="paper" style="max-width:980px;width:calc(100% - 40px);margin:20px auto;text-align:center;padding:48px 24px">
+        <div style="font-size:42px;margin-bottom:12px">📄</div>
+        <small style="color:var(--accent);font-weight:700">CHẾ ĐỘ XEM BẢN PDF GỐC 100%</small>
+        <h2 style="margin:12px 0 10px;font-size:22px">${esc(sourceTitle)}</h2>
+        <p style="color:var(--secondary);max-width:540px;margin:0 auto 24px;line-height:1.8">
+          Nguồn này đang dùng dữ liệu trích xuất mẫu. Để trải nghiệm <strong>trình đọc nguyên bản PDF chuẩn 100%</strong> (giữ nguyên từng trang, phông chữ, bảng biểu, hình vẽ và mộc dấu), bạn hãy tải tệp PDF thật từ máy tính lên Lumi nhé.
+        </p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <button class="btn" onclick="reuploadCurrentSourceFile()">${icon('plus')} Tải lên tệp PDF từ máy tính</button>
+          <button class="btn secondary" onclick="lumiDocMode='text';render()">${icon('note')} Chuyển sang đọc Văn bản AI</button>
+        </div>
+      </article>
     `;
   } else if (lumiLoadingChunks[r.id]) {
     paperBodyHTML = `
@@ -505,12 +526,12 @@ reader = function () {
       'note'
     )} Văn bản AI</button></div>` +
     `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="Trang trước" onclick="changePage(-1)">‹ Trang trước</button> <strong id="pageNum" style="font-size:11.5px;min-width:85px;text-align:center">Trang ${readerPage} / ${totalPages}</strong> <button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="Trang sau" onclick="changePage(1)">Trang sau ›</button>${
-      r.id
-        ? `<a class="btn secondary" href="${LUMI_API_BASE}/sources/${r.id}/file" target="_blank" title="Mở file PDF gốc toàn màn hình" style="padding:5px 9px;font-size:11.5px;text-decoration:none">${icon(
-            'link'
-          )} Phóng to</a>`
-        : ''
-    }</div></div>${paperBodyHTML}</section>` +
+  realPdfId
+    ? `<a class="btn secondary" href="${LUMI_API_BASE}/sources/${realPdfId}/file" target="_blank" title="Mở file PDF gốc toàn màn hình" style="padding:5px 9px;font-size:11.5px;text-decoration:none">${icon(
+        'link'
+      )} Phóng to</a>`
+    : ''
+}</div></div>${paperBodyHTML}</section>` +
     `<section class="chatpanel"><div class="chatheader"><div class="aititle"><span class="tileicon" style="width:34px!important;height:34px!important;border-radius:10px!important">${icon(
       'spark'
     )}</span>Trợ giảng AI Lumi <span class="badge green" style="margin-left:auto">Trực tuyến</span></div><div class="chattabs"><button class="${
@@ -691,8 +712,11 @@ openCitation = function (targetPage, ordinal = 1) {
   if (r) persist('lumi-source-page-' + r.id, readerPage);
 
   const iframe = document.getElementById('lumiPdfFrame');
-  if (iframe && r?.id) {
-    const baseSrc = `${LUMI_API_BASE}/sources/${r.id}/file`;
+  const isRealUUID = r?.id && /^[0-9a-f-]{36}$/i.test(r.id);
+  const realPdfId = isRealUUID ? r.id : (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null);
+
+  if (iframe && realPdfId) {
+    const baseSrc = `${LUMI_API_BASE}/sources/${realPdfId}/file`;
     iframe.src = `${baseSrc}#page=${readerPage}&zoom=page-width`;
     const pageNumEl = document.getElementById('pageNum');
     if (pageNumEl) pageNumEl.textContent = `Trang ${readerPage} / ${maxPage}`;

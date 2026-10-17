@@ -36,17 +36,20 @@ jobs:
           gradle-version: '8.5'
           cache-disabled: true
 
-      - name: Generate Wrapper and Build APK
+      - name: Build Android APK with Gradle
         run: |
           cd android
-          gradle wrapper --gradle-version 8.5
-          chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon 2>&1 | tee ../build.log || (echo "### ❌ Build Error" >> $GITHUB_STEP_SUMMARY && echo '```' >> $GITHUB_STEP_SUMMARY && tail -n 120 ../build.log >> $GITHUB_STEP_SUMMARY && echo '```' >> $GITHUB_STEP_SUMMARY && exit 1)
+          gradle assembleDebug --no-daemon --stacktrace > build.log 2>&1 || (STATUS=$?; echo "### ❌ Build Error" >> $GITHUB_STEP_SUMMARY && echo '```' >> $GITHUB_STEP_SUMMARY && tail -n 80 build.log >> $GITHUB_STEP_SUMMARY && echo '```' >> $GITHUB_STEP_SUMMARY && cat build.log && exit $STATUS)
+          cat build.log
 
       - name: Rename and Prepare APK
         run: |
           APK_FILE=$(find android/ -name "*.apk" | head -n 1)
-          echo "Found APK at: $APK_FILE"
+          if [ -z "$APK_FILE" ]; then
+            echo "❌ No APK file was generated!"
+            exit 1
+          fi
+          echo "✅ Found APK at: $APK_FILE"
           cp "$APK_FILE" Lumi-AI.apk
           ls -lh Lumi-AI.apk
 

@@ -2,5 +2,5 @@
     <color name="primary">#203d35</color>
     <color name="primary_dark">#152923</color>
     <color name="accent">#3fae74</color>
-    <color name="background">#fbfcfa</color>
+    <color name="lumi_bg">#fbfcfa</color>
 </resources>

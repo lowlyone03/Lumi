@@ -41,7 +41,7 @@ jobs:
           cd android
           gradle wrapper --gradle-version 8.5
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --info
 
       - name: Rename and Prepare APK
         run: |

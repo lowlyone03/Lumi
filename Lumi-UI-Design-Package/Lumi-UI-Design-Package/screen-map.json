@@ -1,0 +1,128 @@
+[
+  {
+    "id": "landing",
+    "title": "Trang giới thiệu",
+    "purpose": "Giới thiệu Lumi, cách học, thiết bị, đăng nhập / đăng ký",
+    "open": "Lumi.html?screen=landing"
+  },
+  {
+    "id": "mobile",
+    "title": "App mobile",
+    "purpose": "Màn chào app, đăng nhập / đăng ký và không gian học mobile",
+    "open": "Lumi.html?screen=mobile"
+  },
+  {
+    "id": "home",
+    "title": "Trang chủ",
+    "purpose": "Học tiếp, thêm nguồn, hỏi nhanh",
+    "open": "Lumi.html?screen=home"
+  },
+  {
+    "id": "library",
+    "title": "Góc học tập",
+    "purpose": "Khóa học, học liệu, ghi chú, bài luyện",
+    "open": "Lumi.html?screen=library"
+  },
+  {
+    "id": "source",
+    "title": "Chi tiết học liệu",
+    "purpose": "Đổi tên, thẻ, phiên bản, lỗi, retry, xóa",
+    "open": "Lumi.html?screen=source"
+  },
+  {
+    "id": "reader",
+    "title": "Không gian học",
+    "purpose": "Đọc tài liệu, AI, ghi chú, trích dẫn",
+    "open": "Lumi.html?screen=reader"
+  },
+  {
+    "id": "course",
+    "title": "Khóa học",
+    "purpose": "Liên kết nguồn, đề cương và bài học",
+    "open": "Lumi.html?screen=course"
+  },
+  {
+    "id": "quiz",
+    "title": "Luyện tập",
+    "purpose": "Làm bài, lời giải và kết quả",
+    "open": "Lumi.html?screen=quiz"
+  },
+  {
+    "id": "personal",
+    "title": "Cài đặt",
+    "purpose": "Giao diện, công cụ, tài khoản, dữ liệu",
+    "open": "Lumi.html?screen=personal"
+  },
+  {
+    "id": "hub",
+    "title": "Chức năng",
+    "purpose": "Bản đồ tính năng tương tác",
+    "open": "Lumi.html?screen=hub"
+  },
+  {
+    "id": "history",
+    "title": "Hội thoại",
+    "purpose": "Mở lại, đổi tên, xóa",
+    "open": "Lumi.html?screen=history"
+  },
+  {
+    "id": "review",
+    "title": "Sổ ôn tập",
+    "purpose": "Câu cần ôn và luyện lại",
+    "open": "Lumi.html?screen=review"
+  },
+  {
+    "id": "flashcards",
+    "title": "Flashcard",
+    "purpose": "Tạo, lật, sửa, đánh giá mức nhớ",
+    "open": "Lumi.html?screen=flashcards"
+  },
+  {
+    "id": "planner",
+    "title": "Kế hoạch học",
+    "purpose": "Mục tiêu, việc học và lịch nhắc",
+    "open": "Lumi.html?screen=planner"
+  },
+  {
+    "id": "focus",
+    "title": "Tập trung",
+    "purpose": "Bắt đầu, tạm dừng và lưu phiên",
+    "open": "Lumi.html?screen=focus"
+  },
+  {
+    "id": "stats",
+    "title": "Tiến độ",
+    "purpose": "Kết quả luyện tập và hoạt động",
+    "open": "Lumi.html?screen=stats"
+  },
+  {
+    "id": "glossary",
+    "title": "Thuật ngữ",
+    "purpose": "Tìm, hỏi thêm và lưu",
+    "open": "Lumi.html?screen=glossary"
+  },
+  {
+    "id": "outlines",
+    "title": "Đề cương ôn",
+    "purpose": "Tạo và chỉnh các ý cần ôn",
+    "open": "Lumi.html?screen=outlines"
+  },
+  {
+    "id": "auth",
+    "title": "Tài khoản",
+    "purpose": "Đăng nhập, đăng ký, khôi phục mẫu",
+    "open": "Lumi.html?screen=auth"
+  },
+  {
+    "id": "video",
+    "title": "Video & transcript",
+    "purpose": "Trình phát mô phỏng và ghi chú theo mốc",
+    "open": "Lumi.html?screen=video"
+  },
+  {
+    "id": "notes",
+    "title": "Ghi chú",
+    "purpose": "Tạo, sửa, loại ghi chú và xuất",
+    "open": "Lumi.html?screen=notes"
+  }
+]

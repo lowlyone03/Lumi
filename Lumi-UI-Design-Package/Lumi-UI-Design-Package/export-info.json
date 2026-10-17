@@ -1,0 +1,14 @@
+{
+  "name": "Lumi UI Design Package",
+  "date": "2026-10-17",
+  "sourceCommit": "0ee46122abe72ec1bbe9e79eb4d919c09a0523bf",
+  "format": "static-html-css-javascript",
+  "screens": 21,
+  "themes": [
+    "light",
+    "dark",
+    "comfort"
+  ],
+  "backend": false,
+  "browserVisualQA": false
+}

@@ -1,0 +1,1524 @@
+ĐẶC TẢ ĐỀ XUẤT ĐỒ ÁN TỐT NGHIỆP
+ỨNG DỤNG HỌC TẬP VÀ ÔN TẬP CÁ NHÂN HÓA TỪ HỌC LIỆU ĐA NGUỒN
+REACT NATIVE + AI + RAG
+
+Phiên bản: 1.0 - Bản định hướng phân tích và thiết kế
+Ngày biên soạn: 13/10/2026
+Đối tượng đọc: Sinh viên thực hiện đồ án, giảng viên hướng dẫn, nhóm phát triển.
+
+LƯU Ý VỀ PHẠM VI VÀ TÍNH TRUNG THỰC
+- Đây là bản đề xuất, không phải mô tả một sản phẩm đã được triển khai hoặc kiểm thử.
+- Danh mục có 60 Use Case. Không mặc định phải code toàn bộ để hoàn thành đồ án.
+- Báo cáo chính thức phải ghi rõ: đã triển khai, triển khai một phần, chưa triển khai.
+- Thời gian, hạn mức, mục tiêu hiệu năng trong tài liệu là cấu hình hoặc mục tiêu đề xuất; phải điều chỉnh sau thử nghiệm.
+- AI không bảo đảm luôn trả lời đúng. Mọi chức năng đánh giá bằng AI là hỗ trợ học tập, không thay thế đánh giá chính thức của giáo viên.
+- Không mặc định có quyền tải video, lấy phụ đề hoặc khai thác dữ liệu từ mọi nền tảng.
+- Số lượng chức năng không thay thế chiều sâu kỹ thuật, chất lượng sản phẩm và bằng chứng kiểm thử.
+
+MỤC LỤC
+1. Tổng quan và định vị sản phẩm
+2. Đối tượng, tác nhân và phân quyền
+3. Phạm vi đề xuất và nguyên tắc học tập
+4. Danh mục 60 Use Case theo 8 phân hệ
+5. Đặc tả luồng nghiệp vụ trọng tâm
+6. Kiến trúc hệ thống và luồng AI/RAG
+7. Thiết kế dữ liệu đề xuất
+8. Màn hình và trải nghiệm React Native
+9. Đề xuất API và sự kiện nền
+10. Yêu cầu phi chức năng, bảo mật và quyền riêng tư
+11. Kế hoạch kiểm thử và đánh giá
+12. Phạm vi MVP và lộ trình triển khai
+13. Cấu trúc báo cáo tốt nghiệp
+14. Kịch bản demo, rủi ro và tiêu chí hoàn thành
+15. Checklist chốt đề tài
+
+===============================================================================
+1. TỔNG QUAN VÀ ĐỊNH VỊ SẢN PHẨM
+===============================================================================
+
+1.1. Tên đề tài chính thức gợi ý
+"Xây dựng ứng dụng di động hỗ trợ học tập và ôn tập cá nhân hóa từ học liệu đa nguồn bằng React Native và công nghệ RAG".
+
+Tên ngắn cho sản phẩm: StudyFlow AI. Đây là tên gợi ý, chưa kiểm tra tên miền hoặc nhãn hiệu.
+
+1.2. Bài toán
+Người học thường có học liệu rời rạc: PDF, slide, bài viết và video. Các khó khăn gồm:
+- Không biết nên học phần nào trước và phần nào là kiến thức tiên quyết.
+- Xem video dài nhưng khó tìm lại đoạn giải thích cần thiết.
+- Đọc tài liệu mà chưa hiểu thuật ngữ, ví dụ hoặc cách áp dụng.
+- Thiếu câu hỏi luyện tập bám sát nguồn đang học.
+- Học xong nhưng quên nhanh, chưa biết cần ôn lại nội dung nào.
+- Ghi chú phân tán, thiếu liên kết giữa kiến thức, bài tập và nguồn.
+- Chatbot chung có thể trả lời không đúng tài liệu môn học hoặc không nêu căn cứ.
+
+1.3. Giải pháp
+Người học tạo khóa học cá nhân, thêm học liệu, thiết lập mục tiêu. Hệ thống hỗ trợ:
+Học liệu -> xử lý và lập chỉ mục -> đề xuất lộ trình -> học theo bài -> hỏi đáp có nguồn -> luyện tập -> phân tích lỗi -> ôn tập.
+
+1.4. Giá trị cốt lõi
+A. Tổ chức: biến học liệu rời rạc thành cấu trúc khóa học có thể chỉnh sửa.
+B. Hiểu: giải thích đúng ngữ cảnh, có trích dẫn và phù hợp trình độ khai báo.
+C. Thực hành: quiz, flashcard, trả lời ngắn, tự giải thích và luyện lại lỗi sai.
+D. Ghi nhớ: lập lịch ôn dựa trên kết quả và mức nhớ của người học.
+E. Theo dõi: hiển thị bằng chứng hoạt động, không đồng nhất xem hết video với hiểu bài.
+
+1.5. Định vị ban đầu
+- Đây là nền tảng tự học từ nguồn người dùng có quyền sử dụng, không phải marketplace bán khóa học.
+- Ưu tiên sinh viên IT và 1-2 môn thí điểm, ví dụ Cơ sở dữ liệu và Mạng máy tính.
+- Có thể mở rộng cho học sinh và ngành khác sau khi đánh giá độ phù hợp của nội dung.
+- Không ưu tiên thanh toán, chứng chỉ, mạng xã hội hoặc tích hợp hệ thống trường trong MVP.
+- Học vụ là phân hệ bổ sung, không làm lu mờ mục tiêu học và ôn tập.
+
+1.6. Ví dụ sử dụng
+Người học tạo khóa "Nhập môn Cơ sở dữ liệu", thêm PDF và một video hợp lệ. Người học đặt mục tiêu học trong 4 tuần. AI đề xuất các bài: mô hình quan hệ, khóa, SQL, chuẩn hóa. Người học sửa thứ tự, học một bài, hỏi về khóa ngoại, mở nguồn được trích dẫn, làm quiz, xem chủ đề sai và ôn flashcard đến hạn.
+Nếu tài liệu không có giao dịch hoặc chỉ mục, hệ thống báo thiếu phần đó thay vì tuyên bố khóa học đủ toàn bộ kiến thức.
+
+===============================================================================
+2. ĐỐI TƯỢNG, TÁC NHÂN VÀ PHÂN QUYỀN
+===============================================================================
+
+2.1. Tác nhân chính
+- Người học: học sinh hoặc sinh viên, quản lý học liệu cá nhân, học và ôn tập.
+- Quản trị viên hệ thống: quản lý vận hành, hạn mức, báo lỗi và tài khoản theo quyền được cấp.
+- Biên tập viên học vụ: quản lý văn bản chính thức, thời gian hiệu lực và đối tượng áp dụng.
+- Giáo viên/người hướng dẫn: tác nhân mở rộng nếu triển khai lớp học hoặc duyệt khóa học.
+- Khách được chia sẻ: chỉ xem hoặc sao chép nội dung được chủ sở hữu cho phép.
+
+2.2. Dịch vụ ngoài
+Nhà cung cấp AI, dịch vụ chuyển giọng nói thành văn bản, lưu trữ file, thông báo đẩy và nhà cung cấp đăng nhập là hệ thống hỗ trợ, không phải người sở hữu học liệu.
+Trong sơ đồ UML, chỉ biểu diễn dịch vụ ngoài khi có tương tác thực tế với ranh giới hệ thống.
+
+2.3. Ma trận quyền tối thiểu
+- Chủ sở hữu: tạo, xem, sửa, xóa và chia sẻ khóa học của mình.
+- Người được chia sẻ: chỉ có quyền theo cấu hình; không mặc định được tải toàn bộ file.
+- Biên tập viên học vụ: quản lý học liệu học vụ, không mặc định xem tài liệu cá nhân.
+- Quản trị viên: xem số liệu vận hành tổng hợp; việc xem nội dung riêng cần chính sách và nhật ký truy cập rõ ràng.
+- AI: không phải tác nhân có quyền độc lập. Truy xuất AI phải dùng quyền của người đang yêu cầu.
+
+2.4. Học sinh dưới tuổi trưởng thành
+Nếu triển khai cho trẻ vị thành niên, cần xác định yêu cầu đồng ý, bảo vệ dữ liệu, chia sẻ và giám sát theo pháp luật áp dụng. Không mặc định tạo hồ sơ công khai, bảng xếp hạng hoặc thu thập giọng nói lâu dài. MVP có thể giới hạn đối tượng là sinh viên trưởng thành để giảm phạm vi tuân thủ.
+
+===============================================================================
+3. PHẠM VI ĐỀ XUẤT VÀ NGUYÊN TẮC HỌC TẬP
+===============================================================================
+
+3.1. Phạm vi học liệu
+- MVP: PDF có lớp văn bản và video do người dùng tải lên hợp lệ kèm transcript, hoặc nguồn phụ đề được phép truy cập.
+- Mở rộng: bài viết web công khai, DOCX, PPTX, OCR, nguồn video cụ thể có cơ chế truy cập phù hợp.
+- Không hỗ trợ vượt đăng nhập, paywall, DRM hoặc hạn chế truy cập.
+- Video được xử lý qua transcript trong bản đầu; không tuyên bố hiểu mọi hình ảnh, code hoặc sơ đồ xuất hiện trên màn hình.
+
+3.2. Nguyên tắc phản hồi
+- Ưu tiên nguồn học liệu người học đã chọn.
+- Nêu rõ phần nào là kiến thức bổ sung ngoài nguồn nếu bật chế độ đó.
+- Không có bằng chứng thì trả lời chưa đủ thông tin hoặc hỏi làm rõ.
+- Nguồn xung đột: nêu khác biệt, không tự hợp nhất thành một khẳng định chắc chắn.
+- Với bài tập: ưu tiên gợi ý và phản hồi quá trình; cho phép xem lời giải sau khi người học chủ động chọn.
+- Mức dễ/khó do người dùng chọn hoặc AI đề xuất không đồng nghĩa đã được chuẩn hóa chuyên môn.
+
+3.3. Nguyên tắc cá nhân hóa
+- Dựa trên mục tiêu, kiến thức khai báo, kết quả làm bài và lịch ôn.
+- Tùy chọn đọc/nghe/sơ đồ là sở thích giao diện, không khẳng định có một "phong cách học" cố định quyết định hiệu quả.
+- Điểm tự tin phải tách với kết quả làm bài; tự tin cao vẫn có thể hiểu sai.
+- Ưu tiên thích ứng bằng quy tắc minh bạch trước khi phát triển mô hình dự đoán phức tạp.
+
+3.4. Quy ước mức ưu tiên
+P0: Cốt lõi cho MVP.
+P1: Nâng cao nên triển khai nếu còn thời gian.
+P2: Định hướng mở rộng, không cam kết demo.
+Mức ưu tiên là đề xuất, phải chốt theo nhân lực và thời gian thực tế.
+
+===============================================================================
+4. DANH MỤC 60 USE CASE THEO 8 PHÂN HỆ
+===============================================================================
+
+Cấu trúc mỗi UC: mục tiêu, tác nhân, tiền điều kiện, luồng chính, ngoại lệ, kết quả và nghiệm thu.
+Mỗi UC cần được liên kết với màn hình, API, bảng dữ liệu và test case trong báo cáo chính thức.
+
+-------------------------------------------------------------------------------
+PHÂN HỆ A. TÀI KHOẢN, MỤC TIÊU VÀ CÁ NHÂN HÓA
+-------------------------------------------------------------------------------
+
+UC01. ĐĂNG KÝ, ĐĂNG NHẬP VÀ QUẢN LÝ PHIÊN
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Đăng ký, đăng nhập và quản lý phiên.
+Tiền điều kiện: Chưa đăng nhập hoặc cần cấp lại phiên.
+Luồng chính: Nhập email/mật khẩu; kiểm tra hợp lệ; xác thực; cấp phiên; truy cập trang chủ. Hỗ trợ đăng xuất và thu hồi refresh token. OAuth chỉ thêm khi có cấu hình phù hợp.
+Luồng thay thế/ngoại lệ: Email trùng, mật khẩu sai, phiên hết hạn, quá nhiều lần thử; không tiết lộ tài khoản tồn tại qua thông báo khôi phục.
+Hậu điều kiện/dữ liệu: Tài khoản và phiên hợp lệ, nhật ký bảo mật tối thiểu.
+Tiêu chí nghiệm thu: Token hết hạn bị từ chối; đăng xuất thu hồi phiên; mật khẩu không lưu dạng rõ.
+
+UC02. THIẾT LẬP HỒ SƠ VÀ MỤC TIÊU HỌC TẬP
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Thiết lập hồ sơ và mục tiêu học tập.
+Tiền điều kiện: Đã đăng nhập.
+Luồng chính: Chọn trình độ tự khai báo, ngành/môn, mục tiêu, thời gian rảnh và cách trình bày yêu thích; lưu; cho phép sửa.
+Luồng thay thế/ngoại lệ: Mục tiêu thiếu hoặc thời lượng không hợp lệ; dùng giá trị mặc định minh bạch.
+Hậu điều kiện/dữ liệu: Hồ sơ tùy chọn phục vụ đề xuất, không coi là kết luận năng lực.
+Tiêu chí nghiệm thu: Sửa hồ sơ có hiệu lực trong đề xuất mới; không thay đổi lịch sử câu trả lời.
+
+UC03. LÀM BÀI ĐÁNH GIÁ ĐẦU VÀO
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Làm bài đánh giá đầu vào.
+Tiền điều kiện: Có bộ câu hỏi phù hợp và đủ nguồn.
+Luồng chính: Chọn môn; xem phạm vi; làm bài; nộp; nhận kết quả theo chủ đề và gợi ý điểm bắt đầu.
+Luồng thay thế/ngoại lệ: Bộ đề chưa đủ chất lượng; mất mạng; bài chưa hoàn tất; cho phép tiếp tục hoặc ghi nhận chưa đánh giá.
+Hậu điều kiện/dữ liệu: Kết quả chẩn đoán tham khảo và đề xuất học.
+Tiêu chí nghiệm thu: Kết quả có căn cứ từ câu đã làm; không suy diễn thành chứng nhận trình độ.
+
+UC04. QUẢN LÝ HẠN MỨC VÀ LƯU TRỮ
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Quản lý hạn mức và lưu trữ.
+Tiền điều kiện: Đã đăng nhập.
+Luồng chính: Xem dung lượng, thời lượng xử lý và lượt AI còn lại; trước tác vụ hệ thống kiểm tra và giữ chỗ quota; sau tác vụ đối soát.
+Luồng thay thế/ngoại lệ: Vượt quota; tác vụ lỗi hoặc hủy; giải phóng phần giữ chỗ theo quy tắc.
+Hậu điều kiện/dữ liệu: Người học biết giới hạn; không phát sinh vượt mức không kiểm soát.
+Tiêu chí nghiệm thu: Hai yêu cầu đồng thời không vượt quota; retry không bị tính trùng sai.
+
+UC05. CẤU HÌNH NHẮC HỌC VÀ THÔNG BÁO
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Cấu hình nhắc học và thông báo.
+Tiền điều kiện: Thiết bị hỗ trợ; người dùng cấp quyền nếu cần.
+Luồng chính: Chọn giờ, ngày, múi giờ và loại nhắc; lưu; gửi thông báo; mở đúng khóa học khi bấm.
+Luồng thay thế/ngoại lệ: Từ chối quyền, token thiết bị hết hiệu lực, không có mạng; vẫn có lịch trong app.
+Hậu điều kiện/dữ liệu: Tùy chọn nhắc học và lịch gửi.
+Tiêu chí nghiệm thu: Có thể tắt; không gửi lặp; giờ yên lặng được tôn trọng.
+
+UC06. ĐỒNG BỘ TIẾN ĐỘ VÀ VỊ TRÍ ĐỌC
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Đồng bộ tiến độ và vị trí đọc.
+Tiền điều kiện: Đăng nhập cùng tài khoản trên thiết bị được hỗ trợ.
+Luồng chính: Lưu vị trí video/PDF và tiến độ; đồng bộ; thiết bị khác gợi ý tiếp tục; người học xác nhận.
+Luồng thay thế/ngoại lệ: Hai thiết bị cập nhật đồng thời; dùng phiên bản bản ghi và quy tắc xử lý xung đột.
+Hậu điều kiện/dữ liệu: Vị trí học gần nhất có thể tiếp tục.
+Tiêu chí nghiệm thu: Không cần làm ứng dụng desktop đầy đủ để chứng minh đồng bộ hai thiết bị mobile.
+
+UC07. XUẤT VÀ XÓA DỮ LIỆU CÁ NHÂN
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Xuất và xóa dữ liệu cá nhân.
+Tiền điều kiện: Xác thực lại với thao tác nhạy cảm.
+Luồng chính: Chọn xuất dữ liệu hoặc xóa tài khoản; hiển thị ảnh hưởng; xác nhận; tạo job; thông báo hoàn thành.
+Luồng thay thế/ngoại lệ: Job lỗi, nội dung đã chia sẻ hoặc thời hạn lưu theo chính sách; giải thích phần nào còn giữ.
+Hậu điều kiện/dữ liệu: Dữ liệu được xuất hoặc xóa theo phạm vi đã thông báo.
+Tiêu chí nghiệm thu: Xóa gồm file, vector, hội thoại và quyền chia sẻ liên quan; không chỉ xóa bản ghi user.
+
+-------------------------------------------------------------------------------
+PHÂN HỆ B. KHÓA HỌC VÀ NẠP HỌC LIỆU
+-------------------------------------------------------------------------------
+
+UC08. TẠO VÀ QUẢN LÝ KHÓA HỌC CÁ NHÂN
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Tạo và quản lý khóa học cá nhân.
+Tiền điều kiện: Đã đăng nhập.
+Luồng chính: Nhập tên, mục tiêu, mô tả, tag và ngày dự kiến; tạo; sửa hoặc lưu trữ khóa học.
+Luồng thay thế/ngoại lệ: Tên trống, ngày không hợp lệ; xóa cần xác nhận khác với lưu trữ.
+Hậu điều kiện/dữ liệu: Khóa học thuộc chủ sở hữu.
+Tiêu chí nghiệm thu: Người khác không xem được khóa riêng qua URL hoặc ID đoán được.
+
+UC09. TẢI LÊN VÀ XỬ LÝ PDF
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Tải lên và xử lý PDF.
+Tiền điều kiện: Có khóa học và quyền sửa.
+Luồng chính: Kiểm tra loại/kích thước; tải file; tạo job; trích văn bản theo trang; chia đoạn; tạo embedding; đánh dấu sẵn sàng.
+Luồng thay thế/ngoại lệ: PDF mã hóa, scan không có chữ, file lỗi; báo lý do và lựa chọn nguồn khác.
+Hậu điều kiện/dữ liệu: Tài liệu có phiên bản, đoạn văn và thông tin trang.
+Tiêu chí nghiệm thu: Trích dẫn mở đúng trang; retry không nhân đôi đoạn cùng phiên bản.
+
+UC10. NHẬP DOCX VÀ PPTX
+Mức ưu tiên: P2
+Tác nhân: Người học.
+Mục tiêu: Nhập DOCX và PPTX.
+Tiền điều kiện: Bộ xử lý định dạng được hỗ trợ.
+Luồng chính: Tải file; trích theo heading/đoạn hoặc slide; lưu locator riêng; lập chỉ mục.
+Luồng thay thế/ngoại lệ: Bảng, hình ảnh hoặc công thức không đọc được; hiển thị cảnh báo mất nội dung.
+Hậu điều kiện/dữ liệu: Nội dung và vị trí phù hợp định dạng.
+Tiêu chí nghiệm thu: DOCX không gán số trang giả; PPTX dẫn số slide chính xác.
+
+UC11. THÊM VÀ PHÂN TÍCH NGUỒN VIDEO
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Thêm và phân tích nguồn video.
+Tiền điều kiện: Có quyền sử dụng nguồn; nguồn thuộc danh sách hỗ trợ.
+Luồng chính: Nhập URL hoặc tải video; kiểm tra; lấy transcript hợp lệ hoặc nhận dạng lời nói; lưu đoạn theo thời gian; lập chỉ mục.
+Luồng thay thế/ngoại lệ: Không có quyền truy cập, không có phụ đề, âm thanh kém, video quá dài; báo giới hạn và cho nhập transcript.
+Hậu điều kiện/dữ liệu: Video hoặc tham chiếu nguồn kèm transcript có mốc thời gian.
+Tiêu chí nghiệm thu: Không hứa hỗ trợ mọi nền tảng; không khẳng định hiểu hình ảnh chỉ từ transcript.
+
+UC12. NHẬP BÀI VIẾT WEB CÔNG KHAI
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Nhập bài viết web công khai.
+Tiền điều kiện: URL HTTPS được phép truy cập.
+Luồng chính: Kiểm tra URL và redirect; lấy nội dung chính; lưu tiêu đề, URL, ngày lấy và bản nội dung; lập chỉ mục.
+Luồng thay thế/ngoại lệ: Trang đăng nhập, paywall, JavaScript khó trích, URL nội bộ; từ chối hoặc đề nghị tải bản hợp lệ.
+Hậu điều kiện/dữ liệu: Ảnh chụp nội dung văn bản có nguồn gốc.
+Tiêu chí nghiệm thu: Chặn SSRF và redirect tới mạng nội bộ; ghi rõ nội dung là bản tại thời điểm nhập.
+
+UC13. QUÉT ẢNH TÀI LIỆU BẰNG OCR
+Mức ưu tiên: P2
+Tác nhân: Người học.
+Mục tiêu: Quét ảnh tài liệu bằng OCR.
+Tiền điều kiện: Đã cấp quyền camera hoặc chọn ảnh.
+Luồng chính: Chụp; cắt/xoay; OCR; xem và sửa văn bản; xác nhận đưa vào khóa học.
+Luồng thay thế/ngoại lệ: Ảnh mờ, chữ viết tay, bảng biểu khó; yêu cầu chụp lại hoặc sửa.
+Hậu điều kiện/dữ liệu: Văn bản đã được người dùng xác nhận và ảnh nguồn.
+Tiêu chí nghiệm thu: Không âm thầm coi OCR là chính xác; lưu liên kết đến ảnh gốc.
+
+UC14. THEO DÕI, HỦY VÀ THỬ LẠI JOB XỬ LÝ
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Theo dõi, hủy và thử lại job xử lý.
+Tiền điều kiện: Có job thuộc tài liệu được phép xem.
+Luồng chính: Xem trạng thái từng giai đoạn; nhận cập nhật; hủy nếu có thể; thử lại job lỗi.
+Luồng thay thế/ngoại lệ: Mất kết nối; worker ngừng; hủy khi đã hoàn thành; trả trạng thái thực tế.
+Hậu điều kiện/dữ liệu: Trạng thái rõ và lỗi có thể hành động.
+Tiêu chí nghiệm thu: Không hiển thị phần trăm giả; retry idempotent; xử lý hủy không để dữ liệu mồ côi.
+
+UC15. THAY PHIÊN BẢN HOẶC XÓA HỌC LIỆU
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Thay phiên bản hoặc xóa học liệu.
+Tiền điều kiện: Có quyền sửa nguồn.
+Luồng chính: Thêm phiên bản mới hoặc xác nhận xóa; lập chỉ mục bản mới; chuyển bản active; đánh dấu quiz/lộ trình cũ cần kiểm tra.
+Luồng thay thế/ngoại lệ: Nguồn đang được job xử lý hoặc còn tham chiếu; hủy và xử lý liên kết có kiểm soát.
+Hậu điều kiện/dữ liệu: Nguồn mới active hoặc nguồn bị xóa khỏi truy xuất.
+Tiêu chí nghiệm thu: Chat mới không dùng vector bản đã xóa; lịch sử có cảnh báo nguồn không còn hiệu lực.
+
+-------------------------------------------------------------------------------
+PHÂN HỆ C. LỘ TRÌNH VÀ TRẢI NGHIỆM HỌC
+-------------------------------------------------------------------------------
+
+UC16. ĐỀ XUẤT LỘ TRÌNH TỪ NHIỀU HỌC LIỆU
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Đề xuất lộ trình từ nhiều học liệu.
+Tiền điều kiện: Có nguồn sẵn sàng và mục tiêu.
+Luồng chính: Phân tích chủ đề; đề xuất chương/bài, mục tiêu và nguồn; nêu phần thiếu; người học xem trước.
+Luồng thay thế/ngoại lệ: Nguồn ít, mâu thuẫn hoặc không liên quan; yêu cầu làm rõ, không tạo lộ trình đầy đủ giả.
+Hậu điều kiện/dữ liệu: Bản nháp lộ trình có nguồn hỗ trợ.
+Tiêu chí nghiệm thu: Mỗi bài liên kết học liệu; nội dung thiếu được đánh dấu; chưa tự công bố.
+
+UC17. CHỈNH SỬA VÀ XÁC NHẬN LỘ TRÌNH
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Chỉnh sửa và xác nhận lộ trình.
+Tiền điều kiện: Có bản nháp hoặc lộ trình hiện tại.
+Luồng chính: Sửa tiêu đề, thứ tự, mục tiêu, nguồn; thêm/xóa bài; xác nhận phiên bản.
+Luồng thay thế/ngoại lệ: Xóa bài đã có kết quả; cảnh báo ảnh hưởng và giữ lịch sử phù hợp.
+Hậu điều kiện/dữ liệu: Lộ trình có phiên bản được người học chấp nhận.
+Tiêu chí nghiệm thu: Mobile có thao tác lên/xuống thay cho drag-drop; ID bài không đổi khi sắp xếp.
+
+UC18. ĐỌC TÀI LIỆU VÀ XEM VIDEO TRONG BÀI HỌC
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Đọc tài liệu và xem video trong bài học.
+Tiền điều kiện: Có quyền truy cập nguồn.
+Luồng chính: Mở bài; xem nguồn; mở tab hoặc bottom sheet AI/ghi chú; lưu vị trí đọc.
+Luồng thay thế/ngoại lệ: Định dạng không hỗ trợ hoặc nguồn ngoài mất; mở bằng trình xem ngoài khi hợp lệ.
+Hậu điều kiện/dữ liệu: Một không gian học liền mạch.
+Tiêu chí nghiệm thu: Trên điện thoại không ép chia đôi khó đọc; video không bị reset khi mở chat.
+
+UC19. GIẢI THÍCH ĐOẠN ĐƯỢC CHỌN HOẶC ĐIỂM DỪNG
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Giải thích đoạn được chọn hoặc điểm dừng.
+Tiền điều kiện: Có đoạn văn hoặc transcript quanh thời điểm chọn.
+Luồng chính: Chọn đoạn hoặc dừng video; gửi locator và ngữ cảnh; AI giải thích; hiển thị nguồn.
+Luồng thay thế/ngoại lệ: Không có transcript hoặc chọn vùng ảnh; báo chưa có dữ liệu.
+Hậu điều kiện/dữ liệu: Câu trả lời theo ngữ cảnh cục bộ.
+Tiêu chí nghiệm thu: Không coi transcript tại một giây là toàn bộ ngữ cảnh; lấy cửa sổ đoạn phù hợp.
+
+UC20. GHI CHÚ GẮN TRANG VÀ MỐC THỜI GIAN
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Ghi chú gắn trang và mốc thời gian.
+Tiền điều kiện: Đang xem nguồn.
+Luồng chính: Tạo ghi chú; lưu văn bản và locator; sửa; bấm ghi chú để mở nguồn; tìm kiếm ghi chú.
+Luồng thay thế/ngoại lệ: Nguồn bị thay/xóa; hiển thị cảnh báo thay vì điều hướng sai.
+Hậu điều kiện/dữ liệu: Ghi chú cá nhân liên kết nguồn.
+Tiêu chí nghiệm thu: Mốc thời gian giữ nguyên khi sửa chữ; autosave có trạng thái và phục hồi lỗi.
+
+UC21. TÓM TẮT NHIỀU MỨC ĐỘ VÀ SƠ ĐỒ KIẾN THỨC
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Tóm tắt nhiều mức độ và sơ đồ kiến thức.
+Tiền điều kiện: Có phạm vi nguồn xác định.
+Luồng chính: Chọn ngắn/chi tiết/bảng/sơ đồ; AI tạo; kiểm tra cấu trúc; người học lưu vào bài.
+Luồng thay thế/ngoại lệ: Nguồn quá dài hoặc sơ đồ không hợp lệ; chia phạm vi hoặc trả bản văn bản.
+Hậu điều kiện/dữ liệu: Tóm tắt có nguồn và sơ đồ dạng cấu trúc an toàn.
+Tiêu chí nghiệm thu: Không thực thi mã tùy ý; nếu dùng Mermaid trong WebView phải kiểm soát nội dung và navigation.
+
+UC22. LẬP KẾ HOẠCH HỌC THEO LỊCH RẢNH
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Lập kế hoạch học theo lịch rảnh.
+Tiền điều kiện: Có lộ trình, deadline và thời gian học dự kiến.
+Luồng chính: Chia bài thành phiên; đề xuất lịch; người học sửa và xác nhận; tái lập kế hoạch khi bỏ lỡ.
+Luồng thay thế/ngoại lệ: Khối lượng không phù hợp deadline; cảnh báo quá tải và đề nghị giảm phạm vi.
+Hậu điều kiện/dữ liệu: Lịch học khả thi theo thông tin khai báo.
+Tiêu chí nghiệm thu: Thời lượng là ước tính có thể sửa; không hứa đạt mục tiêu chỉ bằng lịch.
+
+UC23. PHIÊN HỌC TẬP TRUNG VÀ KIỂM TRA CUỐI BÀI
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Phiên học tập trung và kiểm tra cuối bài.
+Tiền điều kiện: Chọn bài và mục tiêu phiên.
+Luồng chính: Bắt đầu phiên; dùng đồng hồ tùy chọn; ghi nhiệm vụ; kết thúc; làm exit ticket và ghi mức tự tin.
+Luồng thay thế/ngoại lệ: App vào nền hoặc người học dừng; cho tiếp tục, không tự tăng thời gian giả.
+Hậu điều kiện/dữ liệu: Nhật ký phiên và câu trả lời cuối bài.
+Tiêu chí nghiệm thu: Phân biệt thời gian hoạt động với thời gian mở app; không coi thời gian là năng lực.
+
+-------------------------------------------------------------------------------
+PHÂN HỆ D. TRỢ GIẢNG AI VÀ HỖ TRỢ TƯ DUY
+-------------------------------------------------------------------------------
+
+UC24. HỎI ĐÁP ĐA NGUỒN CÓ TRÍCH DẪN
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Hỏi đáp đa nguồn có trích dẫn.
+Tiền điều kiện: Nguồn sẵn sàng, có quyền và còn quota.
+Luồng chính: Chọn phạm vi; đặt câu hỏi; truy xuất đoạn được phép; AI trả lời; hiển thị thẻ nguồn mở đúng vị trí.
+Luồng thay thế/ngoại lệ: Không đủ nguồn, xung đột, lỗi API; từ chối có giải thích hoặc hỏi làm rõ.
+Hậu điều kiện/dữ liệu: Hội thoại có nguồn và dấu vết truy xuất.
+Tiêu chí nghiệm thu: Citation dùng ID đoạn tồn tại; không chỉ tin số trang do mô hình tự sinh.
+
+UC25. CHUYỂN CHẾ ĐỘ GIẢI THÍCH
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Chuyển chế độ giải thích.
+Tiền điều kiện: Có câu hỏi và phạm vi tài liệu.
+Luồng chính: Chọn cho người mới, chuyên sâu, ví dụ thực tế hoặc ôn nhanh; AI đổi cách trình bày, giữ căn cứ.
+Luồng thay thế/ngoại lệ: Yêu cầu ví dụ ngoài nguồn; đánh dấu nội dung bổ sung.
+Hậu điều kiện/dữ liệu: Phản hồi theo lựa chọn trình bày.
+Tiêu chí nghiệm thu: Đổi giọng văn không làm đổi kết luận được nguồn hỗ trợ.
+
+UC26. HƯỚNG DẪN SOCRATIC VÀ GỢI Ý TỪNG BƯỚC
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Hướng dẫn Socratic và gợi ý từng bước.
+Tiền điều kiện: Có bài tập hoặc câu hỏi đủ rõ.
+Luồng chính: Người học gửi cách làm; AI hỏi gợi mở; nhận câu trả lời; đưa gợi ý tăng dần; xem lời giải nếu chủ động chọn.
+Luồng thay thế/ngoại lệ: Bài thiếu dữ kiện hoặc AI không xác minh được; hỏi lại.
+Hậu điều kiện/dữ liệu: Lịch sử lập luận và gợi ý thay vì chỉ đáp án.
+Tiêu chí nghiệm thu: Không chặn vô hạn; người học biết có thể đổi sang giải thích trực tiếp.
+
+UC27. TRA CỨU THUẬT NGỮ VÀ TẠO TỪ ĐIỂN CÁ NHÂN
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Tra cứu thuật ngữ và tạo từ điển cá nhân.
+Tiền điều kiện: Có thuật ngữ chọn từ bài học.
+Luồng chính: Chọn từ; nhận định nghĩa theo nguồn và ví dụ; lưu glossary; liên kết flashcard nếu muốn.
+Luồng thay thế/ngoại lệ: Thuật ngữ đa nghĩa; hỏi ngữ cảnh hoặc liệt kê nghĩa theo nguồn.
+Hậu điều kiện/dữ liệu: Từ điển cá nhân theo khóa.
+Tiêu chí nghiệm thu: Có locator nguồn; không tự ghi đè định nghĩa người học đã sửa.
+
+UC28. SO SÁNH KHÁI NIỆM VÀ TẠO VÍ DỤ PHẢN CHỨNG
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: So sánh khái niệm và tạo ví dụ phản chứng.
+Tiền điều kiện: Chọn 2 hoặc nhiều khái niệm.
+Luồng chính: AI tạo bảng tiêu chí, điểm giống/khác, ví dụ và trường hợp không thỏa; người học hỏi tiếp.
+Luồng thay thế/ngoại lệ: Nguồn không đủ so sánh; chỉ ra phần còn thiếu.
+Hậu điều kiện/dữ liệu: Bản so sánh giúp phân biệt khái niệm.
+Tiêu chí nghiệm thu: Ví dụ tự tạo được gắn nhãn; không trích dẫn nguồn cho điều nguồn không nói.
+
+UC29. NHẬN PHẢN HỒI CHO PHẦN TỰ GIẢI THÍCH
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Nhận phản hồi cho phần tự giải thích.
+Tiền điều kiện: Có chủ đề và tiêu chí đối chiếu.
+Luồng chính: Người học tự diễn đạt kiến thức; AI chỉ ra ý đúng, thiếu, dễ nhầm; đề nghị giải thích lại.
+Luồng thay thế/ngoại lệ: Câu quá ngắn, ngoài chủ đề, đáp án chưa rõ; hỏi bổ sung.
+Hậu điều kiện/dữ liệu: Phản hồi luyện tập theo ý chính.
+Tiêu chí nghiệm thu: Không đánh giá năng lực tổng thể từ một câu; dẫn nguồn cho phản hồi sửa lỗi.
+
+UC30. HỎI BẰNG GIỌNG NÓI VÀ NGHE CÂU TRẢ LỜI
+Mức ưu tiên: P2
+Tác nhân: Người học.
+Mục tiêu: Hỏi bằng giọng nói và nghe câu trả lời.
+Tiền điều kiện: Quyền microphone; dịch vụ STT/TTS được cấu hình.
+Luồng chính: Ghi âm; xem transcript trước gửi; hỏi AI; chọn nghe; dừng hoặc phát lại.
+Luồng thay thế/ngoại lệ: Nhận dạng sai, mất mạng, tiếng ồn; sửa chữ hoặc chuyển nhập văn bản.
+Hậu điều kiện/dữ liệu: Tương tác giọng nói có kiểm soát.
+Tiêu chí nghiệm thu: Xin đồng ý ghi âm; chính sách lưu/xóa rõ; không khuyến khích dùng gây mất an toàn khi di chuyển.
+
+UC31. ĐÁNH DẤU, BÁO LỖI VÀ SỬA PHẢN HỒI CÁ NHÂN
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Đánh dấu, báo lỗi và sửa phản hồi cá nhân.
+Tiền điều kiện: Có câu trả lời hoặc học liệu AI sinh.
+Luồng chính: Lưu câu hữu ích; báo loại lỗi; thêm nhận xét hoặc bản sửa cá nhân; quản trị xem theo quyền.
+Luồng thay thế/ngoại lệ: Nguồn đã xóa hoặc báo trùng; vẫn giữ liên kết phiên bản khi có thể.
+Hậu điều kiện/dữ liệu: Feedback và bản sửa tách biệt bản AI.
+Tiêu chí nghiệm thu: Bản sửa cá nhân không tự biến thành đáp án chuẩn của mọi người.
+
+-------------------------------------------------------------------------------
+PHÂN HỆ E. BÀI TẬP VÀ ĐÁNH GIÁ HỌC TẬP
+-------------------------------------------------------------------------------
+
+UC32. TẠO VÀ LÀM QUIZ TRẮC NGHIỆM
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Tạo và làm quiz trắc nghiệm.
+Tiền điều kiện: Có bài/chương và nguồn đủ.
+Luồng chính: Chọn phạm vi, số câu và mức độ; sinh bản nháp; kiểm tra cấu trúc; bắt đầu; trả lời; nộp; xem giải thích và nguồn.
+Luồng thay thế/ngoại lệ: Câu mơ hồ, nhiều đáp án, thiếu nguồn; loại hoặc báo cần xem lại.
+Hậu điều kiện/dữ liệu: Bộ quiz có phiên bản và kết quả từng câu.
+Tiêu chí nghiệm thu: Chấm trắc nghiệm bằng đáp án đã lưu, không gọi AI để quyết định lại mỗi lần nộp.
+
+UC33. LUYỆN ĐIỀN KHUYẾT, GHÉP CẶP VÀ SẮP XẾP
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Luyện điền khuyết, ghép cặp và sắp xếp.
+Tiền điều kiện: Có dữ liệu bài tập hợp lệ.
+Luồng chính: Chọn dạng; làm bài; nhận kết quả và giải thích; lưu lỗi theo chủ đề.
+Luồng thay thế/ngoại lệ: Có nhiều thứ tự hợp lý hoặc câu trả lời đồng nghĩa; cấu hình đáp án chấp nhận.
+Hậu điều kiện/dữ liệu: Đa dạng cách truy hồi kiến thức.
+Tiêu chí nghiệm thu: Quy tắc chấm minh bạch; không dùng dạng sắp xếp khi không có thứ tự xác định.
+
+UC34. TRẢ LỜI NGẮN VÀ NHẬN PHẢN HỒI THEO RUBRIC
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Trả lời ngắn và nhận phản hồi theo rubric.
+Tiền điều kiện: Có câu hỏi, ý chuẩn, nguồn và rubric.
+Luồng chính: Nhập đáp án; AI đánh giá từng tiêu chí; nêu bằng chứng, ý thiếu và gợi ý sửa; người học phản hồi.
+Luồng thay thế/ngoại lệ: Nguồn mâu thuẫn hoặc rubric thiếu; không chấm điểm chắc chắn.
+Hậu điều kiện/dữ liệu: Phản hồi và điểm tham khảo theo phiên bản rubric.
+Tiêu chí nghiệm thu: Có nhãn hỗ trợ luyện tập; đánh giá độ đồng thuận với người chấm trước khi tuyên bố chất lượng.
+
+UC35. LUYỆN BÀI TẬP THEO TÌNH HUỐNG VÀ MỨC GỢI Ý
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Luyện bài tập theo tình huống và mức gợi ý.
+Tiền điều kiện: Có chủ đề ứng dụng và bài đã kiểm tra.
+Luồng chính: Nhận tình huống; chọn cách giải; mở gợi ý theo mức; nộp lời giải; nhận phản hồi.
+Luồng thay thế/ngoại lệ: Bài AI sinh vô nghiệm hoặc thiếu dữ kiện; báo lỗi và không tính vào kết quả.
+Hậu điều kiện/dữ liệu: Kết quả thực hành và mức hỗ trợ đã dùng.
+Tiêu chí nghiệm thu: Phân biệt làm độc lập với làm có gợi ý; không chấm bằng độ dài câu trả lời.
+
+UC36. THI THỬ THEO THỜI GIAN
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Thi thử theo thời gian.
+Tiền điều kiện: Có ngân hàng câu hỏi đã rà soát.
+Luồng chính: Chọn phạm vi; bắt đầu; server ghi thời điểm; lưu đáp án; nộp hoặc hết giờ; xem kết quả.
+Luồng thay thế/ngoại lệ: Mất mạng, đổi thiết bị, app nền; áp dụng quy tắc công khai, không âm thầm mất bài.
+Hậu điều kiện/dữ liệu: Attempt có thời gian và trạng thái rõ.
+Tiêu chí nghiệm thu: Giới hạn thời gian dựa trên server; đây không phải hệ thống thi chính thức chống gian lận.
+
+UC37. LUYỆN TẬP THÍCH ỨNG THEO QUY TẮC
+Mức ưu tiên: P2
+Tác nhân: Người học.
+Mục tiêu: Luyện tập thích ứng theo quy tắc.
+Tiền điều kiện: Đủ lịch sử câu trả lời và nhãn chủ đề.
+Luồng chính: Ưu tiên chủ đề yếu; chọn câu phù hợp; thay đổi mức sau nhiều bằng chứng; cho người học chọn lại.
+Luồng thay thế/ngoại lệ: Dữ liệu ít; dùng mức mặc định và giải thích chưa đủ đánh giá.
+Hậu điều kiện/dữ liệu: Chuỗi luyện tập tùy chỉnh có lý do.
+Tiêu chí nghiệm thu: Không thay đổi mức chỉ từ một câu; lưu lý do đề xuất; có câu kiểm tra lại.
+
+UC38. XEM KẾT QUẢ VÀ SỔ LỖI SAI
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Xem kết quả và sổ lỗi sai.
+Tiền điều kiện: Có attempt đã nộp.
+Luồng chính: Xem câu sai, đáp án đã chọn, lời giải, nguồn và chủ đề; thêm ghi chú lỗi; đánh dấu cần luyện lại.
+Luồng thay thế/ngoại lệ: Câu bị sửa sau khi nộp; giữ phiên bản cũ và cho biết thay đổi.
+Hậu điều kiện/dữ liệu: Sổ lỗi có lịch sử theo bài.
+Tiêu chí nghiệm thu: Không sửa kết quả cũ theo đáp án mới mà không có quy trình minh bạch.
+
+UC39. TẠO BÀI LUYỆN LẠI LỖI SAI
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Tạo bài luyện lại lỗi sai.
+Tiền điều kiện: Có lỗi đã gắn chủ đề.
+Luồng chính: Chọn lỗi hoặc chương; tạo bài tương tự có kiểm tra; làm; đối chiếu kết quả sau ôn.
+Luồng thay thế/ngoại lệ: Không đủ câu mới; cho luyện câu cũ nhưng ghi rõ.
+Hậu điều kiện/dữ liệu: Lần kiểm tra lại và liên kết lỗi ban đầu.
+Tiêu chí nghiệm thu: Không coi thuộc đáp án câu cũ là đã làm chủ kiến thức; ưu tiên câu tương đương mới.
+
+UC40. TỰ TẠO CÂU HỎI VÀ BỔ SUNG NGÂN HÀNG CÁ NHÂN
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Tự tạo câu hỏi và bổ sung ngân hàng cá nhân.
+Tiền điều kiện: Có khóa học và quyền sửa.
+Luồng chính: Nhập câu, đáp án, giải thích, nguồn; AI hỗ trợ rà soát nếu chọn; lưu phiên bản.
+Luồng thay thế/ngoại lệ: Câu thiếu đáp án hoặc chưa xác minh; đánh dấu bản nháp.
+Hậu điều kiện/dữ liệu: Ngân hàng câu hỏi có nguồn gốc người dùng/AI.
+Tiêu chí nghiệm thu: Không tự công khai; sửa câu không mất lịch sử attempt.
+
+-------------------------------------------------------------------------------
+PHÂN HỆ F. GHI NHỚ, ÔN TẬP VÀ TIẾN ĐỘ
+-------------------------------------------------------------------------------
+
+UC41. TẠO VÀ SỬA FLASHCARD TỪ HỌC LIỆU
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Tạo và sửa flashcard từ học liệu.
+Tiền điều kiện: Có nguồn hoặc ghi chú.
+Luồng chính: Chọn phạm vi; AI tạo thẻ một ý chính; xem trước; sửa; lưu bộ thẻ có nguồn.
+Luồng thay thế/ngoại lệ: Thẻ quá dài, câu mơ hồ, thiếu căn cứ; yêu cầu sửa hoặc loại.
+Hậu điều kiện/dữ liệu: Bộ thẻ được người học xác nhận.
+Tiêu chí nghiệm thu: Mỗi thẻ có mặt trước/sau và phiên bản; không lưu mọi bản AI mà không xem.
+
+UC42. ÔN FLASHCARD THEO LỊCH NGẮT QUÃNG
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Ôn flashcard theo lịch ngắt quãng.
+Tiền điều kiện: Có thẻ active và lịch ôn.
+Luồng chính: Lấy thẻ đến hạn; tự nhớ trước khi lật; chọn mức nhớ; cập nhật lịch; kết thúc phiên.
+Luồng thay thế/ngoại lệ: Đánh giá gửi lặp, đổi ngày/múi giờ, thẻ đã sửa; xử lý quy tắc rõ.
+Hậu điều kiện/dữ liệu: Review log và due date mới.
+Tiêu chí nghiệm thu: Chọn rõ thuật toán và tham số; nếu dùng SM-2 với ba nút thì mô tả ánh xạ, không nhận là nguyên bản.
+
+UC43. LUYỆN NHỚ CHỦ ĐỘNG KHÔNG NHÌN TÀI LIỆU
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Luyện nhớ chủ động không nhìn tài liệu.
+Tiền điều kiện: Chọn bài đã học.
+Luồng chính: Ẩn nguồn; trả lời câu gợi nhớ hoặc viết các ý nhớ được; sau nộp mới mở đáp án và đối chiếu.
+Luồng thay thế/ngoại lệ: Người học chọn xem nguồn sớm; ghi nhận có hỗ trợ.
+Hậu điều kiện/dữ liệu: Bằng chứng truy hồi độc lập.
+Tiêu chí nghiệm thu: Không hiển thị đáp án trước khi người học chủ động; chế độ học không trừng phạt xem gợi ý.
+
+UC44. ÔN XEN KẼ NHIỀU CHỦ ĐỀ
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Ôn xen kẽ nhiều chủ đề.
+Tiền điều kiện: Có nhiều chủ đề và câu hợp lệ.
+Luồng chính: Chọn phạm vi; trộn chủ đề có kiểm soát; làm bài; nhận kết quả theo từng nhóm.
+Luồng thay thế/ngoại lệ: Chủ đề chưa học hoặc thiếu tiên quyết; cho loại khỏi phiên.
+Hậu điều kiện/dữ liệu: Phiên ôn đa chủ đề.
+Tiêu chí nghiệm thu: Không trộn ngẫu nhiên vô nghĩa; ghi rõ lý do và phân bố câu.
+
+UC45. ĐỀ XUẤT HỌC LẠI VÀ DẪN VỀ NGUỒN
+Mức ưu tiên: P0
+Tác nhân: Người học.
+Mục tiêu: Đề xuất học lại và dẫn về nguồn.
+Tiền điều kiện: Có kết quả và liên kết chủ đề-nguồn.
+Luồng chính: Tổng hợp lỗi; ưu tiên chủ đề; đề xuất đọc/xem đoạn liên quan, quiz và thẻ; người học xác nhận.
+Luồng thay thế/ngoại lệ: Nguồn bị xóa hoặc số câu quá ít; ghi mức bằng chứng thấp.
+Hậu điều kiện/dữ liệu: Danh sách ôn tập có lý do và locator.
+Tiêu chí nghiệm thu: Nhấn đề xuất mở đúng nguồn; không gọi một lần sai là lỗ hổng chắc chắn.
+
+UC46. XEM BẢN ĐỒ TIẾN ĐỘ VÀ BẰNG CHỨNG HỌC
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Xem bản đồ tiến độ và bằng chứng học.
+Tiền điều kiện: Có hoạt động học.
+Luồng chính: Xem tỷ lệ bài hoàn thành, kết quả gần đây, câu đã luyện và thẻ đến hạn; mở chi tiết chủ đề.
+Luồng thay thế/ngoại lệ: Dữ liệu ít hoặc offline; hiển thị chưa đủ dữ liệu và thời điểm cập nhật.
+Hậu điều kiện/dữ liệu: Dashboard tiến độ.
+Tiêu chí nghiệm thu: Tách hoàn thành nội dung với kết quả kiến thức; không suy diễn thang năng lực chưa hiệu chuẩn.
+
+UC47. THEO DÕI THÓI QUEN VÀ MỤC TIÊU ÔN TẬP
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Theo dõi thói quen và mục tiêu ôn tập.
+Tiền điều kiện: Có mục tiêu tuần.
+Luồng chính: Đặt số phiên hoặc nhiệm vụ; theo dõi; nhận nhắc nhẹ; điều chỉnh mục tiêu khi bận.
+Luồng thay thế/ngoại lệ: Bỏ lỡ ngày; cho dời lịch, không dùng thông báo gây áp lực.
+Hậu điều kiện/dữ liệu: Lịch sử thói quen và kế hoạch linh hoạt.
+Tiêu chí nghiệm thu: Streak chỉ là động lực, không đại diện chất lượng; có thể tắt gamification.
+
+UC48. TẢI GÓI HỌC ĐỂ ÔN OFFLINE
+Mức ưu tiên: P2
+Tác nhân: Người học.
+Mục tiêu: Tải gói học để ôn offline.
+Tiền điều kiện: Nguồn được phép tải và còn dung lượng thiết bị.
+Luồng chính: Chọn ghi chú/thẻ/quiz/PDF; tải; học offline; lưu sự kiện; đồng bộ khi có mạng.
+Luồng thay thế/ngoại lệ: File quyền hạn thay đổi, đồng bộ xung đột, hết dung lượng; báo rõ.
+Hậu điều kiện/dữ liệu: Gói offline có phiên bản và hàng đợi đồng bộ.
+Tiêu chí nghiệm thu: Chat AI qua API không hoạt động offline trong bản đầu; mã hóa và xóa gói khi đăng xuất theo chính sách.
+
+-------------------------------------------------------------------------------
+PHÂN HỆ G. CHIA SẺ VÀ HỌC NHÓM
+-------------------------------------------------------------------------------
+
+UC49. CHIA SẺ KHÓA HỌC HOẶC CẤU TRÚC KHÓA HỌC
+Mức ưu tiên: P2
+Tác nhân: Chủ sở hữu, người được chia sẻ.
+Mục tiêu: Chia sẻ khóa học hoặc cấu trúc khóa học.
+Tiền điều kiện: Có quyền phân phối nội dung chọn chia sẻ.
+Luồng chính: Chọn phạm vi gồm lộ trình/quiz/file; tạo lời mời hoặc link; người nhận truy cập; chủ thu hồi.
+Luồng thay thế/ngoại lệ: File không được phép chia sẻ, link hết hạn; từ chối phù hợp.
+Hậu điều kiện/dữ liệu: Quyền chia sẻ có phạm vi và thời hạn.
+Tiêu chí nghiệm thu: Không mặc định public; AI truy xuất đúng quyền; thu hồi ngăn lượt truy cập mới.
+
+UC50. THAM GIA NHÓM HỌC VÀ PHÂN VAI
+Mức ưu tiên: P2
+Tác nhân: Người học, chủ nhóm.
+Mục tiêu: Tham gia nhóm học và phân vai.
+Tiền điều kiện: Có lời mời hợp lệ.
+Luồng chính: Tham gia; chủ phân vai; thành viên xem học liệu chung; rời nhóm hoặc bị thu hồi.
+Luồng thay thế/ngoại lệ: Mã hết hạn, nhóm đầy, quyền thay đổi; hiển thị rõ.
+Hậu điều kiện/dữ liệu: Thành viên và vai trò nhóm.
+Tiêu chí nghiệm thu: Không lộ hồ sơ hoặc tiến độ riêng nếu chưa đồng ý.
+
+UC51. THẢO LUẬN VÀ GHI CHÚ CỘNG TÁC
+Mức ưu tiên: P2
+Tác nhân: Thành viên nhóm.
+Mục tiêu: Thảo luận và ghi chú cộng tác.
+Tiền điều kiện: Có quyền trên bài học.
+Luồng chính: Đăng câu hỏi/ghi chú; phản hồi; gắn nguồn; báo nội dung không phù hợp.
+Luồng thay thế/ngoại lệ: Sửa đồng thời hoặc nội dung vi phạm; quản lý phiên bản và kiểm duyệt.
+Hậu điều kiện/dữ liệu: Thảo luận theo bài và nguồn.
+Tiêu chí nghiệm thu: Tách ghi chú cá nhân/chung; có báo cáo, xóa và quyền kiểm duyệt.
+
+UC52. XUẤT BỘ ÔN TẬP VÀ GHI CHÚ
+Mức ưu tiên: P1
+Tác nhân: Người học.
+Mục tiêu: Xuất bộ ôn tập và ghi chú.
+Tiền điều kiện: Có quyền với nội dung xuất.
+Luồng chính: Chọn ghi chú/quiz/flashcard; xuất TXT hoặc CSV theo định dạng; tải file; giữ thông tin nguồn.
+Luồng thay thế/ngoại lệ: Nguồn không cho phân phối hoặc dữ liệu quá lớn; hạn chế phần xuất.
+Hậu điều kiện/dữ liệu: File ôn tập có cấu trúc.
+Tiêu chí nghiệm thu: Không xuất tài liệu người khác ngoài quyền; không kèm secret hoặc dữ liệu riêng không chọn.
+
+-------------------------------------------------------------------------------
+PHÂN HỆ H. HỌC VỤ VÀ QUẢN TRỊ
+-------------------------------------------------------------------------------
+
+UC53. TRA CỨU HỌC VỤ THEO VĂN BẢN CHÍNH THỨC
+Mức ưu tiên: P2
+Tác nhân: Người học.
+Mục tiêu: Tra cứu học vụ theo văn bản chính thức.
+Tiền điều kiện: Có kho học vụ đã duyệt.
+Luồng chính: Chọn trường/khóa/đối tượng; đặt câu hỏi; lọc hiệu lực; trả lời kèm nguồn và hướng liên hệ.
+Luồng thay thế/ngoại lệ: Thiếu năm áp dụng, văn bản xung đột; hỏi lại và không kết luận chắc chắn.
+Hậu điều kiện/dữ liệu: Câu trả lời học vụ theo kho riêng.
+Tiêu chí nghiệm thu: Không dùng ghi chú cá nhân để khẳng định chính sách trường.
+
+UC54. TÌM BIỂU MẪU VÀ QUY TRÌNH HÀNH CHÍNH
+Mức ưu tiên: P2
+Tác nhân: Người học.
+Mục tiêu: Tìm biểu mẫu và quy trình hành chính.
+Tiền điều kiện: Có biểu mẫu và quy trình được duyệt.
+Luồng chính: Chọn nhu cầu; xem bước thực hiện, thời hạn và phòng ban; tải bản đúng phiên bản.
+Luồng thay thế/ngoại lệ: Biểu mẫu hết hiệu lực hoặc link hỏng; báo và hướng đến đơn vị phụ trách.
+Hậu điều kiện/dữ liệu: Quy trình và file có nguồn.
+Tiêu chí nghiệm thu: Không tự tạo một mẫu rồi gọi là mẫu chính thức.
+
+UC55. QUẢN LÝ VĂN BẢN VÀ HIỆU LỰC HỌC VỤ
+Mức ưu tiên: P2
+Tác nhân: Biên tập viên học vụ.
+Mục tiêu: Quản lý văn bản và hiệu lực học vụ.
+Tiền điều kiện: Được cấp quyền quản lý kho.
+Luồng chính: Tải văn bản; gắn đối tượng, ngày hiệu lực, ngày hết hiệu lực; duyệt; thay thế hoặc thu hồi.
+Luồng thay thế/ngoại lệ: Khoảng ngày chồng chéo, thiếu nguồn; cảnh báo trước duyệt.
+Hậu điều kiện/dữ liệu: Văn bản có trạng thái và audit log.
+Tiêu chí nghiệm thu: Truy xuất áp dụng ngày/đối tượng; lịch sử giữ phiên bản.
+
+UC56. GIÁM SÁT VẬN HÀNH, CHI PHÍ VÀ XỬ LÝ BÁO LỖI
+Mức ưu tiên: P1
+Tác nhân: Quản trị viên.
+Mục tiêu: Giám sát vận hành, chi phí và xử lý báo lỗi.
+Tiền điều kiện: Được cấp quyền.
+Luồng chính: Xem job lỗi, độ trễ, usage, quota, câu không đủ nguồn ở mức phù hợp; xem feedback; điều tra và xử lý.
+Luồng thay thế/ngoại lệ: Log chứa dữ liệu riêng; che dữ liệu hoặc giới hạn quyền xem.
+Hậu điều kiện/dữ liệu: Dashboard vận hành, quyết định xử lý và audit log.
+Tiêu chí nghiệm thu: Chi phí dùng usage/cấu hình giá có thời điểm; không mặc định log toàn bộ tài liệu hoặc chat riêng.
+
+UC57. BIÊN SOẠN VÀ DUYỆT KHÓA HỌC HƯỚNG DẪN
+Mức ưu tiên: P2
+Tác nhân: Giáo viên/người hướng dẫn.
+Mục tiêu: Biên soạn và duyệt khóa học hướng dẫn.
+Tiền điều kiện: Có vai trò được cấp và nguồn được phép sử dụng.
+Luồng chính: Soạn bài hoặc dùng AI tạo bản nháp; kiểm tra mục tiêu, nguồn và bài tập; duyệt phiên bản; công bố cho lớp hoặc nhóm được chọn.
+Luồng thay thế/ngoại lệ: Nguồn thiếu quyền hoặc nội dung chưa rà soát; giữ bản nháp và báo phần cần sửa.
+Hậu điều kiện/dữ liệu: Khóa học có người chịu trách nhiệm duyệt và lịch sử phiên bản.
+Tiêu chí nghiệm thu: AI không tự gắn nhãn đã được giáo viên duyệt; giáo viên chỉ sửa phạm vi được cấp.
+
+UC58. GIAO NHIỆM VỤ HỌC VÀ ÔN TẬP THEO LỚP
+Mức ưu tiên: P2
+Tác nhân: Giáo viên, người học.
+Mục tiêu: Giao nhiệm vụ học và ôn tập theo lớp.
+Tiền điều kiện: Có lớp/nhóm và khóa học đã duyệt.
+Luồng chính: Giáo viên chọn bài, quiz hoặc bộ thẻ; đặt thời hạn; giao; người học nhận, thực hiện và xem trạng thái; cho phép gia hạn theo quyền.
+Luồng thay thế/ngoại lệ: Người học không có quyền nguồn hoặc deadline đã đổi; cập nhật minh bạch, không tạo nhiệm vụ bất khả thi.
+Hậu điều kiện/dữ liệu: Assignment, người nhận, hạn hoàn thành và kết quả.
+Tiêu chí nghiệm thu: Nhiệm vụ không biến phản hồi AI thành điểm học chính thức; phân biệt đã nộp và đạt yêu cầu.
+
+UC59. XEM BÁO CÁO HỌC TẬP LỚP THEO QUYỀN
+Mức ưu tiên: P2
+Tác nhân: Giáo viên, người học.
+Mục tiêu: Xem báo cáo học tập lớp theo quyền.
+Tiền điều kiện: Có quan hệ lớp hợp lệ và chính sách chia sẻ tiến độ.
+Luồng chính: Giáo viên xem tỷ lệ hoàn thành và chủ đề lớp thường sai; mở cá nhân khi được phép; người học xem dữ liệu của mình và giải thích chỉ số.
+Luồng thay thế/ngoại lệ: Nhóm quá nhỏ hoặc dữ liệu nhạy cảm; hạn chế chi tiết và phạm vi truy cập.
+Hậu điều kiện/dữ liệu: Báo cáo tổng hợp phục vụ điều chỉnh bài dạy.
+Tiêu chí nghiệm thu: Không xếp hạng công khai mặc định; không kết luận năng lực từ thời gian mở app; có audit truy cập.
+
+UC60. QUẢN LÝ NGÂN HÀNG CÂU HỎI ĐÃ RÀ SOÁT
+Mức ưu tiên: P2
+Tác nhân: Giáo viên, biên tập viên nội dung.
+Mục tiêu: Quản lý ngân hàng câu hỏi đã rà soát.
+Tiền điều kiện: Có quyền biên tập trong môn/khóa.
+Luồng chính: Nhận câu hỏi từ AI hoặc người dùng; kiểm tra đáp án, nguồn, mức độ; sửa; duyệt; phát hành phiên bản dùng cho luyện tập và thi thử.
+Luồng thay thế/ngoại lệ: Câu có nhiều đáp án hoặc nguồn thay đổi; đưa về cần rà soát và thông báo quiz phụ thuộc.
+Hậu điều kiện/dữ liệu: Ngân hàng câu hỏi có trạng thái, reviewer và phiên bản.
+Tiêu chí nghiệm thu: Chỉ câu đã duyệt được gắn nhãn đã rà soát; lịch sử attempt giữ bản đã dùng.
+
+===============================================================================
+5. ĐẶC TẢ LUỒNG NGHIỆP VỤ TRỌNG TÂM
+===============================================================================
+
+5.1. Luồng nạp PDF: UC09 + UC14
+Đầu vào: course_id, file, tên hiển thị, khai báo quyền sử dụng.
+1. App yêu cầu phiên upload. Server kiểm tra chủ sở hữu và quota.
+2. Server kiểm tra định dạng, giới hạn kích thước và tên file; không chỉ tin phần mở rộng.
+3. Upload vào vùng tạm; xác nhận hoàn tất; tạo document_version và ingestion_job.
+4. Worker kiểm tra file, trích văn bản theo trang, lưu cảnh báo trang không trích được.
+5. Chuẩn hóa nhưng không làm mất mapping đoạn văn về trang gốc.
+6. Chia đoạn theo cấu trúc, có overlap phù hợp; lưu chunk_id và source locator.
+7. Tạo embedding theo batch; retry có backoff; không tính trùng cùng idempotency key.
+8. Lưu vector cùng document_version_id, course_id và trạng thái truy xuất.
+9. Chỉ chuyển ready khi dữ liệu bắt buộc hoàn tất; thông báo người học.
+10. Nếu lỗi, lưu mã lỗi an toàn, gợi ý hành động và dọn dữ liệu tạm theo chính sách.
+Hậu điều kiện: nguồn ready hoặc failed rõ ràng; không có trạng thái ready giả.
+Test trọng tâm: PDF không có chữ, file vượt dung lượng, upload dở, job bị kill, retry và xóa trong khi xử lý.
+
+5.2. Luồng nạp video: UC11
+1. Người học chọn nguồn được hỗ trợ và xác nhận quyền sử dụng.
+2. Server kiểm tra URL hoặc file, thời lượng và quota.
+3. Nếu có transcript hợp lệ: nhập, chuẩn hóa và giữ start_ms/end_ms.
+4. Nếu nhận video hợp lệ: tách âm thanh và chuyển giọng nói thành văn bản bằng dịch vụ đã cấu hình.
+5. Lưu ngôn ngữ, cảnh báo nhận dạng, timestamp và transcript version.
+6. Chia đoạn ngữ nghĩa nhưng vẫn giữ đoạn thời gian.
+7. Lập chỉ mục; cho người học xem transcript và sửa sai nếu có chức năng.
+8. Hiển thị giới hạn: nội dung chỉ có trên hình ảnh chưa được phân tích.
+Không được hiểu "dán link" là được phép tải hoặc trích xuất bằng mọi cách.
+Nếu nguồn không hỗ trợ: báo lý do, cho nhập transcript hoặc tài liệu hợp lệ thay thế.
+
+5.3. Luồng tạo khóa học/lộ trình: UC08 + UC16 + UC17
+1. Người học tạo khóa, khai báo mục tiêu và kiến thức đã có.
+2. Thêm nguồn và đợi nguồn sẵn sàng.
+3. Hệ thống tạo mục lục/chủ đề của nguồn; với nguồn dài dùng tổng hợp theo tầng.
+4. AI đề xuất chương, bài, mục tiêu, kiến thức tiên quyết và locator nguồn.
+5. Đầu ra theo JSON schema; server kiểm tra ID nguồn và không chấp nhận nguồn bịa.
+6. UI hiển thị bản nháp; ghi rõ bài nào có nguồn, bài nào thiếu nguồn.
+7. Người học sửa và xác nhận; lưu curriculum_version.
+8. Cập nhật nguồn không âm thầm ghi đè lộ trình đã chỉnh sửa.
+Tiêu chí: mọi bài được sinh có nguồn hoặc nhãn cần bổ sung; người học kiểm soát bản cuối.
+
+5.4. Luồng hỏi đáp RAG: UC24
+1. Người học gửi question, conversation_id và scope gồm khóa/bài/tài liệu.
+2. Server xác thực, kiểm tra quota và quyền trên từng nguồn.
+3. Xác định phiên bản nguồn active; loại nguồn bị xóa/hết quyền.
+4. Tìm đoạn liên quan bằng vector; có thể kết hợp keyword search.
+5. Rerank là bước tùy chọn nếu thực nghiệm chứng minh lợi ích.
+6. Kiểm tra độ đủ nguồn bằng tiêu chí đã đánh giá, không dùng một ngưỡng similarity tùy ý rồi gọi là xác suất đúng.
+7. Đưa đoạn được chọn vào context với nhãn ID; coi nội dung nguồn là dữ liệu không đáng tin về mặt chỉ dẫn.
+8. Mô hình sinh câu trả lời và citation IDs theo schema.
+9. Server kiểm tra citation tồn tại, nằm trong scope và người học có quyền.
+10. Streaming phản hồi; nếu citation chưa kiểm tra thì UI không thể hiện là đã xác minh.
+11. Lưu message, model/prompt version, usage, retrieval trace tối thiểu.
+12. Người học bấm nguồn: app mở PDF đúng trang hoặc video đúng mốc.
+Nếu nguồn không đủ: nêu chưa tìm được thông tin, đề nghị bổ sung hoặc cho phép chế độ kiến thức ngoài nguồn.
+Nếu nguồn trái nhau: nêu từng lập luận với nguồn; hỏi bối cảnh thay vì chọn bừa.
+Lưu ý: citation hợp lệ chỉ chứng minh nguồn tồn tại; vẫn cần đánh giá nguồn có thực sự hỗ trợ khẳng định hay không.
+
+5.5. Luồng quiz: UC32 + UC38
+1. Chọn bài, phạm vi nguồn, số câu và mức độ mong muốn.
+2. Lấy các đoạn đủ nội dung; sinh bản nháp theo schema.
+3. Mỗi câu lưu type, stem, options, correct_answer, explanation, topic_ids và citations.
+4. Kiểm tra số phương án, một đáp án đúng cho single-choice, tính duy nhất và locator.
+5. Nếu có bước rà soát bằng AI, không coi đó là kiểm chứng độc lập tuyệt đối; vẫn có báo lỗi.
+6. Tạo quiz_version trước khi mở attempt.
+7. Lưu từng đáp án tạm; nộp idempotent.
+8. Server chấm theo answer key đã chốt, không để client tự quyết định điểm.
+9. Hiển thị kết quả, lời giải, nguồn và câu báo lỗi.
+10. Câu bị xác nhận lỗi có quy trình loại/sửa; không âm thầm thay kết quả cũ.
+MVP nên chọn single-choice trước; tránh đưa mọi dạng bài vào cùng một lần.
+
+5.6. Luồng đề xuất ôn lại: UC39 + UC45
+1. Tổng hợp câu sai theo topic_id, mức gợi ý và thời điểm.
+2. Tính chỉ số ưu tiên minh bạch, ví dụ lỗi gần đây + nhiều lần sai + lâu chưa kiểm tra.
+3. Hiển thị số bằng chứng; nếu ít dữ liệu, ghi nhận đề xuất sơ bộ.
+4. Tìm đoạn nguồn liên quan topic và xác nhận nguồn active.
+5. Đề xuất đọc/xem, tự giải thích và bài tương đương.
+6. Người học chọn nhiệm vụ; thực hiện và làm kiểm tra lại.
+7. So sánh kết quả nhưng phân biệt câu mới với câu đã thuộc đáp án.
+Không gọi điểm tổng hợp là "xác suất làm chủ kiến thức" nếu chưa có mô hình được hiệu chuẩn.
+
+5.7. Luồng flashcard: UC41 + UC42
+1. Người học xác nhận thẻ sau khi tạo.
+2. Tạo lịch mặc định, trạng thái mới và due date theo thuật toán đã chọn.
+3. Mở phiên lấy thẻ đến hạn trong giới hạn hợp lý.
+4. Hiển thị mặt trước; người học nhớ; lật mặt sau; tự đánh giá.
+5. Server ghi review event duy nhất và tính lịch mới.
+6. Với ba mức nhớ, mô tả ánh xạ cụ thể sang thang thuật toán; kiểm thử thẻ quên và thẻ đã thuộc.
+7. Thẻ sửa đáng kể có thể reset hoặc rút ngắn lịch; người học được thông báo.
+8. Nộp lại cùng event_id không tạo hai lần ôn.
+Không khẳng định thuật toán bảo đảm ghi nhớ lâu dài với mọi người học.
+
+5.8. Luồng chia sẻ: UC49
+1. Chủ sở hữu chọn chỉ chia cấu trúc, quiz/ghi chú hay cả file.
+2. Hiển thị cảnh báo bản quyền và dữ liệu cá nhân; xác nhận.
+3. Tạo grant/invite token có expiry và scope; mặc định private.
+4. Người nhận đăng nhập hoặc truy cập theo chính sách đã chốt.
+5. Backend kiểm tra grant ở cả API đọc lẫn truy xuất RAG.
+6. Thu hồi grant có hiệu lực cho yêu cầu mới; link file ký ngắn hạn.
+7. Bản sao đã xuất/tải có thể không thu hồi được; phải thông báo giới hạn này.
+
+5.9. Luồng xóa hoặc thay phiên bản học liệu: UC15
+1. Kiểm tra quyền, tham chiếu và trạng thái job.
+2. Tạo thao tác có ID; chặn nguồn khỏi truy xuất ngay khi xóa được xác nhận.
+3. Hủy job hoặc làm worker nhận trạng thái tombstone trước khi ghi.
+4. Xóa file/chunk/vector và liên kết theo chính sách.
+5. Quiz/ghi chú/lộ trình phụ thuộc được đánh dấu nguồn không còn truy cập; giữ lịch sử thích hợp.
+6. Có job dọn dữ liệu lỗi và kiểm tra nguồn mồ côi.
+Không dùng cascade tùy tiện làm mất toàn bộ kết quả học mà không thông báo.
+
+===============================================================================
+6. KIẾN TRÚC HỆ THỐNG VÀ LUỒNG AI/RAG
+===============================================================================
+
+6.1. Bộ công nghệ đề xuất
+- Mobile: React Native, Expo, TypeScript.
+- Điều hướng: Expo Router hoặc React Navigation, chọn một hướng nhất quán.
+- Server state: TanStack Query; state UI: Context hoặc Zustand nếu cần.
+- Backend: Python FastAPI, thư viện validation/schema và ORM phù hợp.
+- DB: PostgreSQL và pgvector. Keyword search có thể dùng full-text search.
+- File: object storage tương thích S3; dùng signed URL có thời hạn.
+- Job nền: Redis + hàng đợi/worker phù hợp, ví dụ Celery; chọn một cơ chế chính.
+- AI: adapter cho nhà cung cấp LLM và embedding, không khóa logic nghiệp vụ vào một API.
+- Admin web: React/Next.js ở mức tối thiểu nếu cần.
+- Triển khai: Docker Compose cho đồ án; HTTPS và quản lý secret ở môi trường chạy.
+- CI: lint, typecheck, test và build; không bắt buộc Kubernetes.
+Phiên bản thư viện và SDK phải kiểm tra khi bắt đầu code, không coi danh sách này là cam kết tương thích mọi phiên bản.
+
+6.2. Sơ đồ logic dạng chữ
+[App React Native] ---------- [API Backend]
+                                   |
+                       +-----------+------------+
+                       |           |            |
+                    [Auth]     [Course]       [AI Tutor]
+                       |           |            |
+                       +---- [PostgreSQL + pgvector]
+                                   |
+                            [Queue / Worker]
+                                   |
+              +--------------------+--------------------+
+              |                    |                    |
+       [PDF/Web parser]      [STT/Transcript]    [LLM/Embedding]
+              |
+       [Object Storage]
+
+[Admin Web] ---------------- [API Backend]
+[Notification worker] ------ [Push provider] ------ [Mobile]
+
+6.3. Tổ chức backend
+modules/auth, users, courses, sources, ingestion, curriculum, chat, assessment, review, progress, sharing, academic, admin.
+services/llm, embeddings, storage, parser, transcription, notifications.
+workers/ingestion, cleanup, reminder.
+Không cần tách microservices ở MVP. Modular monolith dễ phát triển và kiểm thử hơn cho nhóm nhỏ.
+
+6.4. Luồng xử lý nền
+Job trạng thái: queued -> extracting -> chunking -> embedding -> validating -> ready.
+Nhánh: failed, cancel_requested, canceled.
+Tách trạng thái job với trạng thái học liệu active; worker phải kiểm tra nguồn chưa bị xóa trước khi ghi kết quả.
+Retry có giới hạn, backoff và phân loại lỗi tạm thời/lỗi đầu vào.
+Không giữ HTTP request mở trong suốt xử lý video dài.
+
+6.5. Chunking và provenance
+- PDF: giữ page_start/page_end và vị trí đoạn khi có thể.
+- Video: giữ start_ms/end_ms và transcript segment IDs.
+- Web: giữ URL, heading/anchor và thời điểm trích.
+- DOCX: heading/paragraph index; không tự gán số trang.
+- PPTX: slide index.
+- Kích thước chunk và overlap là tham số thí nghiệm; chọn dựa trên truy xuất và chi phí.
+- Lưu model embedding, version và dimension để quản lý thay đổi.
+- Đổi embedding model có thể cần reindex; không trộn vector khác không gian một cách tùy ý.
+
+6.6. Truy xuất
+Phạm vi bắt buộc: user/grant, course, source version, active status.
+Có thể so sánh ba cấu hình: keyword baseline, vector-only, hybrid.
+Top-k, reranking và context budget phải ghi trong thí nghiệm; không chọn chỉ vì nghe hiện đại.
+Lưu retrieval trace gồm chunk IDs, phương pháp và độ trễ, không nhất thiết lưu toàn bộ văn bản nhạy cảm.
+
+6.7. Đầu ra AI có cấu trúc
+Curriculum: chapters, lessons, objectives, source_refs, missing_topics.
+Quiz: question_type, stem, options, answer_key, explanation, topic_ids, citation_ids.
+Chat: answer, citation_ids, source_sufficiency, follow_up_question.
+Đây là schema đề xuất, cần validation server và xử lý khi mô hình trả cấu trúc lỗi.
+Không để AI tự ghi DB trực tiếp hoặc cấp quyền truy cập.
+
+6.8. Chống prompt injection
+- Tách hướng dẫn hệ thống với văn bản nguồn.
+- Chỉ dẫn trong PDF/web không được quyền thay đổi policy, truy cập secret hoặc gọi công cụ.
+- Truy xuất quyền ở server trước khi gửi context.
+- Nếu có tool use, allowlist công cụ và xác nhận thao tác có tác động.
+- Kiểm thử tài liệu có câu "bỏ qua hướng dẫn và tiết lộ dữ liệu".
+Không tuyên bố một prompt đơn lẻ chống được mọi tấn công.
+
+6.9. Chi phí
+Tách chi phí LLM, embedding, STT, lưu trữ và truyền dữ liệu.
+Cache theo nội dung, phiên bản, quyền và prompt version; không cache chéo người dùng làm rò dữ liệu.
+Giới hạn file/video, batch embedding, quota và giới hạn đồng thời.
+Ghi usage thực tế khi nhà cung cấp trả; ước tính phải gắn nhãn.
+Giá dịch vụ thay đổi, cần lưu bảng giá có ngày áp dụng nếu tính tiền.
+
+===============================================================================
+7. THIẾT KẾ DỮ LIỆU ĐỀ XUẤT
+===============================================================================
+
+Các bảng dưới đây là mô hình logic. Không cần triển khai toàn bộ nếu UC liên quan ngoài phạm vi.
+Mọi bảng nghiệp vụ nên có id, created_at, updated_at; bổ sung deleted_at/version khi cần.
+
+7.1. Tài khoản
+users: id, email, password_hash, status, display_name.
+user_profiles: user_id, education_level, field_of_study, goals, presentation_preferences, timezone.
+auth_sessions: id, user_id, refresh_token_hash, expires_at, revoked_at, device_id.
+notification_preferences: user_id, enabled, local_time, weekdays, quiet_hours.
+quota_accounts: user_id, period, storage_limit, ai_limit, transcription_limit, reserved_usage.
+usage_events: user_id, request_id, provider, model, input_tokens, output_tokens, duration, estimated_cost, price_version.
+
+7.2. Khóa học
+courses: id, owner_id, title, description, goal, target_date, visibility, status.
+course_tags: course_id, tag.
+curriculum_versions: id, course_id, version_no, status, generated_by, prompt_version.
+chapters: id, curriculum_version_id, title, position.
+lessons: id, chapter_id, title, objective, position, estimated_minutes.
+lesson_source_refs: lesson_id, source_version_id, locator, relationship_type.
+topics: id, course_id, name, description.
+lesson_topics: lesson_id, topic_id.
+
+7.3. Học liệu
+sources: id, course_id, owner_id, type, display_name, original_url, active_version_id, status.
+source_versions: id, source_id, version_no, content_hash, storage_key, mime_type, size_bytes, language, extracted_at.
+ingestion_jobs: id, source_version_id, stage, status, attempt_count, error_code, started_at, finished_at, cancel_requested.
+transcript_segments: id, source_version_id, start_ms, end_ms, text, language.
+source_chunks: id, source_version_id, text, locator_json, chunk_order, embedding_model, embedding_version, embedding.
+source_warnings: source_version_id, warning_type, message, locator.
+Thông tin chủ sở hữu/quyền nên được truy vấn qua quan hệ đúng; nếu denormalize cần đảm bảo cập nhật nhất quán.
+
+7.4. Chat và ghi chú
+conversations: id, user_id, course_id, scope_json, title.
+messages: id, conversation_id, role, content, status, model_version, prompt_version.
+message_citations: message_id, chunk_id, locator_snapshot, support_status.
+retrieval_events: id, message_id, method, selected_chunk_ids, duration_ms.
+notes: id, owner_id, course_id, lesson_id, source_version_id, locator_json, body, revision.
+glossary_items: id, owner_id, course_id, term, definition, source_ref.
+feedback: id, reporter_id, target_type, target_id, category, comment, status.
+
+7.5. Đánh giá
+quizzes: id, course_id, owner_id, title, scope_json.
+quiz_versions: id, quiz_id, version_no, status, generation_metadata.
+questions: id, quiz_version_id, type, stem, options_json, answer_key_json, explanation, rubric_json, origin.
+question_topics: question_id, topic_id.
+question_source_refs: question_id, source_version_id, locator_json.
+quiz_attempts: id, quiz_version_id, user_id, status, started_at, deadline_at, submitted_at, score.
+attempt_answers: id, attempt_id, question_id, response_json, is_correct, score, hints_used, feedback_json.
+error_notes: id, user_id, answer_id, topic_id, personal_note, resolved_at.
+Đáp án nhạy cảm của bài đang thi không gửi xuống client trước khi được phép.
+
+7.6. Ôn tập
+flashcard_decks: id, course_id, owner_id, title.
+flashcards: id, deck_id, front, back, source_ref, revision, status.
+card_schedules: card_id, user_id, due_at, interval_days, repetition_count, ease_factor, algorithm_version.
+card_reviews: id, event_id, card_id, user_id, rating, reviewed_at, previous_state, next_state.
+study_sessions: id, user_id, course_id, lesson_id, started_at, ended_at, active_seconds, self_confidence.
+lesson_progress: user_id, lesson_id, completion_status, last_source_locator, revision.
+review_tasks: id, user_id, course_id, topic_id, reason_json, source_ref, status, due_at.
+
+7.7. Chia sẻ và quản trị mở rộng
+course_grants: id, course_id, grantee_id, role, scope_json, expires_at, revoked_at.
+share_invites: id, course_id, token_hash, scope_json, expires_at.
+study_groups, group_members, discussion_posts.
+Mở rộng lớp học: class_memberships, assignments, assignment_recipients, question_approvals và curriculum_approvals; dùng khi triển khai UC57-UC60.
+academic_documents: source_id, issuing_unit, applicable_cohort, effective_from, effective_until, approval_status.
+audit_logs: actor_id, action, target_type, target_id, timestamp, safe_metadata.
+
+7.8. Ràng buộc quan trọng
+- Unique email theo chính sách chuẩn hóa phù hợp.
+- Unique request/event ID cho tác vụ nộp bài, review và usage để tránh ghi lặp.
+- Foreign key và index trên owner_id/course_id/version/status.
+- Quiz attempt tham chiếu quiz_version, không chỉ quiz hiện tại.
+- Locator phải có type; không dùng một trường "page" cho mọi nguồn.
+- Timestamp nghiệp vụ lưu UTC; UI hiển thị theo múi giờ người dùng.
+- Xóa nguồn và cleanup vector phải được kiểm thử xuyên hệ thống.
+
+===============================================================================
+8. MÀN HÌNH VÀ TRẢI NGHIỆM REACT NATIVE
+===============================================================================
+
+8.1. Điều hướng chính đề xuất
+Tab 1: Trang chủ - học tiếp, nhiệm vụ hôm nay, thẻ đến hạn.
+Tab 2: Khóa học - khóa riêng và khóa được chia sẻ nếu triển khai.
+Tab 3: Ôn tập - quiz, flashcard, sổ lỗi sai.
+Tab 4: Cá nhân - mục tiêu, quota, thông báo, dữ liệu.
+Không cần một tab chat chung nếu chat có ngữ cảnh rõ theo khóa học.
+
+8.2. Danh sách màn hình
+1. Đăng nhập/đăng ký/khôi phục tài khoản nếu triển khai.
+2. Thiết lập mục tiêu và tùy chọn.
+3. Trang chủ học tiếp.
+4. Danh sách khóa học, tìm kiếm/lọc.
+5. Tạo/sửa khóa học.
+6. Chi tiết khóa: lộ trình, học liệu, luyện tập, tiến độ.
+7. Thêm nguồn và thông tin quyền sử dụng.
+8. Theo dõi job, lỗi và thử lại.
+9. Xem bản nháp lộ trình và xác nhận.
+10. Chi tiết bài học.
+11. PDF viewer/video viewer.
+12. Khung AI theo bài, chọn phạm vi và chế độ.
+13. Thẻ nguồn và điều hướng locator.
+14. Ghi chú gắn nguồn.
+15. Chọn phạm vi tạo quiz.
+16. Làm quiz và trạng thái lưu đáp án.
+17. Kết quả, sổ lỗi, đề xuất học lại.
+18. Bộ flashcard và phiên ôn.
+19. Lịch học và dashboard.
+20. Cài đặt, quota và quản lý dữ liệu.
+Màn hình mở rộng chỉ đưa vào prototype khi cần; không ghi là đã code.
+
+8.3. Quy tắc UX
+- Trên mobile dùng bottom sheet hoặc tab nội dung/AI, không chia đôi ép chữ quá nhỏ.
+- Giữ trạng thái playback khi mở ghi chú/chat.
+- Phản hồi loading, empty, failed, canceled và offline rõ ràng.
+- Tác vụ dài có thể rời màn hình; job tiếp tục ở server.
+- Trích dẫn là thành phần có thể bấm, hiển thị tên nguồn và locator dễ hiểu.
+- Đáp án quiz không lộ trước khi nộp trong chế độ kiểm tra.
+- Không dùng thông báo "AI chắc chắn đúng" hoặc màu xanh làm người học hiểu là đã xác minh tuyệt đối.
+- Hỗ trợ cỡ chữ, contrast, screen reader và vùng chạm phù hợp.
+- Khi dùng WebView xem PDF/sơ đồ, hạn chế navigation, script và tài nguyên ngoài.
+
+8.4. Trạng thái offline
+MVP: báo mất mạng, giữ nháp câu hỏi/ghi chú/đáp án nếu có local persistence.
+Mở rộng: gói học offline và đồng bộ sự kiện.
+Không quảng cáo AI offline khi hệ thống đang gọi API từ xa.
+
+===============================================================================
+9. ĐỀ XUẤT API VÀ SỰ KIỆN NỀN
+===============================================================================
+
+Đây là thiết kế REST tham khảo, không phải API đã tồn tại.
+Prefix: /api/v1. Dùng HTTPS, auth và phân quyền cho mọi endpoint liên quan.
+
+9.1. Auth/Profile
+POST /auth/register
+POST /auth/login
+POST /auth/refresh
+POST /auth/logout
+GET /me
+PATCH /me/profile
+GET /me/quota
+PATCH /me/notification-preferences
+POST /me/export
+DELETE /me/account
+
+9.2. Course/Source
+GET, POST /courses
+GET, PATCH, DELETE /courses/{course_id}
+POST /courses/{course_id}/sources/upload-init
+POST /courses/{course_id}/sources/upload-complete
+POST /courses/{course_id}/sources/from-url
+GET /courses/{course_id}/sources
+GET /sources/{source_id}
+POST /sources/{source_id}/versions
+DELETE /sources/{source_id}
+GET /jobs/{job_id}
+POST /jobs/{job_id}/cancel
+POST /jobs/{job_id}/retry
+
+9.3. Curriculum/Learning
+POST /courses/{course_id}/curriculum/generate
+GET /courses/{course_id}/curriculum
+PATCH /curriculum-versions/{version_id}
+POST /curriculum-versions/{version_id}/confirm
+GET /lessons/{lesson_id}
+PATCH /lessons/{lesson_id}/progress
+POST /notes
+GET /courses/{course_id}/notes
+PATCH, DELETE /notes/{note_id}
+
+9.4. AI
+POST /courses/{course_id}/conversations
+POST /conversations/{conversation_id}/messages
+GET /conversations/{conversation_id}/messages
+POST /sources/{source_id}/explain
+POST /courses/{course_id}/summaries
+POST /feedback
+Streaming qua SSE/fetch stream hoặc cơ chế tương thích thư viện mobile đã kiểm tra; không giả định mọi API browser chạy nguyên trên React Native.
+
+9.5. Assessment/Review
+POST /courses/{course_id}/quizzes/generate
+GET /quizzes/{quiz_id}
+POST /quizzes/{quiz_id}/attempts
+PUT /attempts/{attempt_id}/answers/{question_id}
+POST /attempts/{attempt_id}/submit
+GET /attempts/{attempt_id}/result
+GET /courses/{course_id}/error-notes
+POST /courses/{course_id}/review-tasks/generate
+POST /courses/{course_id}/flashcards/generate
+GET /me/cards/due
+POST /cards/{card_id}/reviews
+GET /courses/{course_id}/progress
+
+9.6. Sharing/Admin - ngoài MVP nếu chưa chốt
+POST /courses/{course_id}/share-invites
+POST /share-invites/accept
+DELETE /course-grants/{grant_id}
+GET /admin/jobs
+GET /admin/usage
+GET /admin/feedback
+PATCH /admin/feedback/{feedback_id}
+
+9.7. Quy tắc API
+- ID không thay thế kiểm tra quyền.
+- Pagination cho danh sách; giới hạn số phần tử và kích thước body.
+- Idempotency-Key cho create job/submit/review phù hợp.
+- Mã lỗi ổn định: SOURCE_UNSUPPORTED, QUOTA_EXCEEDED, SOURCE_NOT_READY, PERMISSION_DENIED, PROVIDER_UNAVAILABLE.
+- Không trả stack trace, secret hoặc nội dung người khác trong lỗi.
+- Response mẫu: {data, meta, request_id}; lỗi: {error: {code, message}, request_id}.
+- Không ép mọi lỗi trả HTTP 200.
+
+9.8. Sự kiện nền
+source.uploaded, ingestion.started, ingestion.failed, source.ready, source.deleted,
+curriculum.generated, quiz.generated, attempt.submitted, review.recorded,
+reminder.due, feedback.created.
+Sự kiện có event_id, entity_id, user_id/scope, occurred_at và version; handler chịu được gửi lặp.
+
+===============================================================================
+10. YÊU CẦU PHI CHỨC NĂNG, BẢO MẬT VÀ QUYỀN RIÊNG TƯ
+===============================================================================
+
+10.1. Hiệu năng
+- Đo riêng API không AI, thời gian truy xuất, thời gian đến token đầu và tổng thời gian trả lời.
+- Báo cáo p50/p95 và điều kiện mạng/phần cứng; không chỉ báo trung bình.
+- Mục tiêu tham khảo: API đọc nội bộ p95 dưới 1 giây trong môi trường demo; phải đo để xác nhận.
+- Với AI và video, không cam kết thời gian cố định trước khi thử provider và kích thước dữ liệu.
+- Load test số người đồng thời thực tế phù hợp đồ án; ghi rõ không đại diện triển khai toàn trường.
+
+10.2. Khả dụng và phục hồi
+- Job retry có giới hạn và backoff.
+- Backup DB, kiểm thử restore tối thiểu một lần.
+- Dữ liệu upload tạm có thời hạn dọn.
+- Khi AI lỗi, app vẫn xem được tài liệu, ghi chú và kết quả đã có.
+- Có timeout, circuit breaker hoặc giới hạn gọi lại phù hợp.
+
+10.3. An toàn tài khoản
+- Mật khẩu hash bằng thuật toán phù hợp như Argon2 hoặc bcrypt với cấu hình kiểm tra.
+- Refresh token lưu dạng hash, rotation và thu hồi theo thiết kế.
+- Trên mobile dùng secure storage cho thông tin phiên nhạy cảm; không đặt secret trong bundle.
+- Rate limit đăng nhập, upload và endpoint AI.
+- Kiểm tra quyền theo object cho tất cả endpoint.
+
+10.4. URL/file an toàn
+- Chặn IP nội bộ, loopback, metadata endpoint và redirect tới vùng bị chặn; bảo vệ trước DNS rebinding theo hạ tầng thực tế.
+- Kiểm tra MIME, kích thước, độ dài giải nén và timeout parser.
+- Parser/media processing chạy cách ly và giới hạn tài nguyên.
+- File upload không được phục vụ như mã thực thi.
+- Signed URL ngắn hạn; log không chứa URL mang token lâu dài.
+
+10.5. Dữ liệu và quyền riêng tư
+- Tài liệu cá nhân mặc định private.
+- Nêu rõ dữ liệu nào gửi sang nhà cung cấp AI; chính sách lưu của provider cần xác minh trước triển khai.
+- Không dùng nội dung cá nhân để huấn luyện/chia sẻ ngoài mục đích nếu chưa có căn cứ và đồng ý cần thiết.
+- Thu thập tối thiểu; không bắt buộc ngày sinh, mã sinh viên hoặc thông tin nhạy cảm nếu không cần.
+- Xóa và export có phạm vi rõ; backup retention phải thông báo trong chính sách.
+- Log vận hành che dữ liệu riêng; quyền xem nội dung có audit.
+
+10.6. AI và tính toàn vẹn học tập
+- Tách chế độ tutor gợi mở và chế độ giải thích trực tiếp.
+- Không quảng cáo app như công cụ làm hộ bài thi.
+- Feedback điểm tự luận có nhãn tham khảo.
+- Chặn nguồn lỗi thời/ngoài quyền trước truy xuất, không trông chờ LLM tự quyết.
+- Theo dõi prompt/model version để tái hiện lỗi.
+
+10.7. Quan sát hệ thống
+Metrics: job success/failure, queue wait, extraction time, embedding time, retrieval latency, provider latency, usage và báo lỗi.
+Trace: request_id liên kết app/API/job/AI.
+Audit: thao tác xóa, chia sẻ, duyệt học vụ và truy cập quản trị nhạy cảm.
+Không lưu secret, raw token hoặc toàn bộ file trong log debug.
+
+===============================================================================
+11. KẾ HOẠCH KIỂM THỬ VÀ ĐÁNH GIÁ
+===============================================================================
+
+11.1. Bộ dữ liệu đánh giá đề xuất
+- Chọn 1-2 môn thí điểm, nguồn được phép dùng.
+- Lập khoảng 80-120 câu hỏi tham khảo, tùy khả năng rà soát.
+- Mỗi câu có: câu hỏi, đáp án đối chiếu, nguồn/trang/mốc, loại và người rà soát.
+- Có câu đơn nguồn, đa nguồn, không có đáp án, mơ hồ, nguồn xung đột và tài liệu có chỉ dẫn độc hại.
+- Tách bộ dùng chỉnh tham số khỏi bộ đánh giá cuối; không tối ưu rồi báo trên cùng toàn bộ câu.
+Các số trên là đề xuất thiết kế, không phải dữ liệu đã thu thập.
+
+11.2. Đánh giá retrieval
+- Recall@k: trong k đoạn đầu có đoạn liên quan được gán nhãn hay không.
+- MRR khi có nhãn relevance phù hợp.
+- Độ trễ truy xuất.
+- So sánh keyword baseline, vector-only và hybrid nếu triển khai.
+- Ghi top-k, chunking, embedding model và dataset version.
+
+11.3. Đánh giá câu trả lời
+Rubric đề xuất:
+0: Sai hoặc không trả lời đúng yêu cầu.
+1: Có ý đúng nhưng sai/thiếu trọng yếu.
+2: Cơ bản đúng, thiếu nhỏ.
+3: Đúng, đủ trong phạm vi nguồn, diễn đạt rõ.
+Đánh giá riêng: độ đúng, độ bám nguồn, độ đầy đủ, tính hữu ích và trích dẫn.
+Citation validity: locator tồn tại và mở đúng nguồn.
+Citation support: đoạn được trích có thực sự hỗ trợ khẳng định.
+Không gộp hai tiêu chí này thành một.
+
+11.4. Từ chối và mơ hồ
+- Đo tỷ lệ từ chối đúng với câu ngoài nguồn.
+- Đo tỷ lệ từ chối nhầm với câu có đáp án.
+- Kiểm tra AI hỏi lại khi cần đối tượng/khóa/năm áp dụng.
+- Không dùng số confidence do LLM tự viết như xác suất đã hiệu chuẩn.
+
+11.5. Quiz và nội dung học
+- Đánh giá mức bám nguồn, tính rõ ràng, duy nhất đáp án và phù hợp mức độ.
+- Ghi tỷ lệ câu phải sửa/loại trong mẫu được rà soát.
+- Kiểm tra quy tắc chấm, repeat submission và versioning.
+- Với AI chấm trả lời ngắn, so sánh người chấm theo cùng rubric, báo sai lệch và mức đồng thuận.
+- Nếu chỉ có ít mẫu, nêu giới hạn, không suy rộng kết luận.
+
+11.6. Đánh giá học tập thử nghiệm
+Có thể thực hiện học thử với nhóm tình nguyện nhỏ:
+1. Bài kiểm tra trước.
+2. Học cùng app trong một phiên có phạm vi xác định.
+3. Bài kiểm tra sau với câu tương đương, không chỉ lặp nguyên đề.
+4. Nếu khả thi, kiểm tra trì hoãn sau vài ngày.
+5. Khảo sát dễ dùng, hữu ích và mức tin cậy cảm nhận.
+Không có nhóm đối chứng/phân bổ phù hợp thì không khẳng định app là nguyên nhân duy nhất gây cải thiện.
+Xin đồng ý tham gia và không thu dữ liệu nhận diện không cần thiết.
+
+11.7. Các tầng kiểm thử
+Unit: chunk locator, quota, scoring, schedule, permission helper.
+Integration: upload->job->DB/vector; chat->retrieval->citation; submit->result->review task.
+E2E: người dùng tạo khóa, thêm nguồn, học, quiz, ôn.
+Security: IDOR, SSRF, injection, token revoke, signed URL, privilege escalation.
+Resilience: kill worker, mất mạng, provider timeout, duplicate event.
+Mobile: Android/iOS theo thiết bị thực tế được hỗ trợ, camera/mic/background và cỡ màn hình.
+
+11.8. Test case tiêu biểu
+TC01: Người A yêu cầu tài liệu người B -> bị từ chối.
+TC02: Người A hỏi AI để lấy dữ liệu người B -> retrieval không có đoạn của B.
+TC03: PDF scan -> thông báo không có lớp văn bản nếu OCR chưa triển khai.
+TC04: Video không hỗ trợ -> báo lý do, không treo vô hạn.
+TC05: Job retry -> không nhân đôi vector.
+TC06: Xóa nguồn -> chat mới không truy xuất nguồn đó.
+TC07: Link localhost/metadata -> bị chặn.
+TC08: Tài liệu có prompt injection -> không tiết lộ dữ liệu/secret.
+TC09: Quiz submit hai lần -> một kết quả hợp lệ.
+TC10: Card review gửi lặp -> lịch thay đổi một lần.
+TC11: Citation PDF -> đúng trang, đúng phiên bản.
+TC12: Citation video -> đúng mốc có nội dung được trích.
+TC13: Câu ngoài nguồn -> từ chối có giải thích.
+TC14: Nguồn mâu thuẫn -> phản ánh khác biệt và hỏi làm rõ.
+TC15: Mất mạng khi ghi chú -> không báo đã lưu server nếu chưa lưu.
+TC16: Hết quota -> chặn tác vụ mới trước khi phát sinh xử lý lớn.
+TC17: Đổi tài liệu -> quiz cũ giữ version và cảnh báo.
+TC18: Thu hồi share -> không còn quyền truy xuất mới.
+TC19: Refresh token đã thu hồi -> không cấp phiên mới.
+TC20: AI trả JSON lỗi -> xử lý fallback an toàn, không ghi dữ liệu hỏng.
+
+11.9. Ma trận truy vết mẫu
+UC09 -> SourceUploadScreen -> upload-init/upload-complete -> sources/jobs/chunks -> TC03, TC05.
+UC24 -> LessonChatSheet -> messages -> messages/citations/retrieval -> TC02, TC08, TC11, TC13.
+UC32 -> QuizScreen -> attempts/submit -> attempts/answers -> TC09, TC17.
+UC42 -> CardReviewScreen -> card reviews -> schedules/reviews -> TC10.
+UC49 -> SharingScreen -> grants -> course_grants -> TC18.
+Mở rộng ma trận cho mọi UC được code.
+
+===============================================================================
+12. PHẠM VI MVP VÀ LỘ TRÌNH TRIỂN KHAI
+===============================================================================
+
+12.1. Lõi tối thiểu - khoảng 12 UC, có thể hoàn thành sâu hơn thay vì dàn trải
+UC01: Auth.
+UC08: Khóa học.
+UC09: PDF.
+UC11: Một nguồn video hợp lệ.
+UC14: Job trạng thái/retry.
+UC16: Đề xuất lộ trình.
+UC17: Chỉnh và xác nhận lộ trình.
+UC18: Viewer.
+UC24: RAG có trích dẫn.
+UC32: Quiz.
+UC38: Kết quả và sổ lỗi.
+UC45: Đề xuất học lại.
+Các cơ chế quyền, quota tối thiểu, bảo mật và xóa dữ liệu liên quan vẫn cần thiết ở hạ tầng, dù UI quản trị mở rộng chưa làm.
+Nếu video mất nhiều thời gian, chốt video upload + transcript hợp lệ thay vì nhiều nền tảng URL.
+
+12.2. Bản khuyến nghị nếu đủ thời gian - thêm 5 UC
+UC02: Mục tiêu cá nhân.
+UC15: Version/xóa nguồn.
+UC20: Ghi chú theo nguồn.
+UC31: Báo lỗi AI.
+UC39: Bài luyện lại lỗi.
+Đây là 17 UC, không phải yêu cầu bắt buộc cho một người.
+
+12.3. Bản mạnh về ôn tập - thêm khi lõi đã ổn
+UC41 + UC42: Flashcard và lịch ôn.
+UC43: Nhớ chủ động.
+UC46: Dashboard.
+UC05: Nhắc học.
+Không làm voice, OCR và cộng đồng trước khi RAG/quiz có chất lượng.
+
+12.4. Lộ trình tham khảo 16 tuần
+Tuần 1-2: Chốt phạm vi, nguồn hợp lệ, nghiên cứu liên quan, prototype và test dataset sơ bộ.
+Tuần 3-4: Auth, khóa học, DB, storage và upload PDF.
+Tuần 5-6: Worker, transcript video, chunking, embedding, source locator.
+Tuần 7-8: RAG, quyền truy xuất, citation navigation, bộ test đầu tiên.
+Tuần 9-10: Lộ trình, viewer, ghi chú và trạng thái lỗi.
+Tuần 11-12: Quiz, kết quả, topic và remediation.
+Tuần 13: Flashcard nếu đủ thời gian; nếu không, củng cố lõi.
+Tuần 14: Security, hiệu năng, E2E, thử nghiệm người dùng.
+Tuần 15: Hoàn thiện báo cáo, bảng phạm vi và số liệu thực tế.
+Tuần 16: Sửa lỗi, đóng băng chức năng, tập demo và chuẩn bị phương án dự phòng.
+Lộ trình phụ thuộc kinh nghiệm; không cam kết 16 tuần là đủ cho 60 UC.
+
+12.5. Chia việc cho nhóm 3 người
+A: Mobile, navigation, viewer, quiz/flashcard UI, UX.
+B: Backend, auth, DB, storage, quyền, job và deployment.
+C: AI/RAG, curriculum/quiz generation, dataset, evaluation.
+Cả nhóm: đặc tả, integration, testing và báo cáo; tránh một người độc quyền kiến thức toàn bộ hệ thống.
+
+12.6. Khi làm một mình
+- Ưu tiên một OS demo ổn định trước, nhưng không gọi là cross-platform đã kiểm thử nếu chỉ thử Android.
+- Auth một phương thức, hai loại nguồn, một dạng quiz.
+- Modular monolith + một worker.
+- Không làm cộng đồng, marketplace, voice và OCR đồng thời.
+- Admin tối thiểu bằng màn hình job/feedback, không xây cổng quản trị đồ sộ.
+
+===============================================================================
+13. CẤU TRÚC BÁO CÁO TỐT NGHIỆP
+===============================================================================
+
+Chương 1. Giới thiệu
+Bối cảnh; bài toán; mục tiêu; đối tượng; phạm vi; phương pháp và đóng góp.
+
+Chương 2. Cơ sở lý thuyết và công nghệ
+React Native; backend/API; xử lý tài liệu; embedding; vector search; RAG; active recall và spaced repetition.
+Phân biệt kiến thức tổng quan với lựa chọn được kiểm chứng trong đồ án.
+Tra cứu và trích dẫn nguồn học thuật/tài liệu chính thức khi viết chương này.
+
+Chương 3. Khảo sát và phân tích yêu cầu
+Persona, tình huống học, hệ thống liên quan, yêu cầu chức năng/phi chức năng, actor, use case.
+Danh sách 60 UC là roadmap; bảng phạm vi chỉ rõ UC nào đã chọn.
+Không tuyên bố đã khảo sát người dùng nếu chưa thực hiện.
+
+Chương 4. Thiết kế hệ thống
+Kiến trúc; ERD; sequence; state machine; API; RAG pipeline; quyền; UX.
+Thể hiện thiết kế phù hợp phần thực sự triển khai.
+
+Chương 5. Triển khai
+Môi trường, cấu trúc code, màn hình thực tế, logic quan trọng, tích hợp và xử lý lỗi.
+Nêu hạn chế của parser/video/AI, không chỉ ảnh chụp giao diện đẹp.
+
+Chương 6. Kiểm thử và đánh giá
+Dataset, phương pháp, baseline, test case, kết quả retrieval/chat/quiz, hiệu năng và người dùng.
+Bảng số liệu phải lấy từ thực nghiệm; ghi mẫu, điều kiện, phiên bản và giới hạn.
+
+Chương 7. Kết luận và hướng phát triển
+Kết quả đạt được theo mục tiêu; UC đã triển khai; tồn tại; mở rộng có thứ tự ưu tiên.
+
+Phụ lục
+Đặc tả UC; API; schema; prompt mẫu không chứa secret; rubric; câu hỏi đánh giá; hướng dẫn cài đặt; hướng dẫn người dùng.
+
+Sơ đồ nên có
+1. Use case tổng quát theo phân hệ và sơ đồ phạm vi MVP.
+2. ERD.
+3. Kiến trúc/deployment.
+4. Sequence upload và xử lý.
+5. Sequence RAG và citation.
+6. Sequence quiz/submit/remediation.
+7. State diagram ingestion job.
+8. Activity diagram học -> luyện -> ôn.
+Không tạo hàng chục sơ đồ trùng nhau chỉ để tăng số trang.
+
+===============================================================================
+14. KỊCH BẢN DEMO, RỦI RO VÀ TIÊU CHÍ HOÀN THÀNH
+===============================================================================
+
+14.1. Kịch bản demo khoảng 10-15 phút
+A. Mở app, giới thiệu mục tiêu khóa học và học liệu đã chuẩn bị.
+B. Nạp PDF nhỏ; hiển thị xử lý. Với video dài dùng nguồn đã xử lý để không mất thời gian.
+C. Tạo bản nháp lộ trình, sửa một bài và xác nhận.
+D. Mở bài; xem video/PDF; tạo ghi chú theo vị trí.
+E. Hỏi một câu có đáp án; bấm citation tới nguồn.
+F. Hỏi một câu không có đáp án; minh họa từ chối đúng.
+G. Làm quiz ngắn; cố ý sai một câu; mở giải thích và đề xuất học lại.
+H. Nếu đã có flashcard, minh họa ôn và ngày đến hạn.
+I. Minh họa quyền bằng hai tài khoản hoặc test có thể tái hiện.
+J. Kết thúc bằng số liệu thật và phần chưa triển khai.
+Không dựng kết quả giả dưới tên kết quả trực tiếp. Nếu dùng video quay dự phòng phải nói rõ.
+
+14.2. Rủi ro chính và phương án
+R1: Không lấy được transcript từ nền tảng.
+-> Giới hạn nguồn hỗ trợ, nhận transcript hoặc video hợp lệ do người học cung cấp.
+R2: AI bịa kiến thức hoặc citation.
+-> RAG, schema, kiểm tra locator, abstention, feedback và đánh giá support.
+R3: Quá nhiều chức năng, thiếu thời gian.
+-> Chốt lõi 12 UC, đóng băng tính năng trước giai đoạn kiểm thử.
+R4: Chi phí AI/video cao.
+-> Quota, batch, giới hạn thời lượng, usage và cache có kiểm soát quyền.
+R5: Dữ liệu môn học thiếu/chất lượng thấp.
+-> Chọn nguồn thí điểm từ đầu; người có chuyên môn rà soát mẫu.
+R6: Mobile viewer hoặc streaming không ổn định.
+-> Prototype kỹ thuật sớm; có fallback mở nguồn hoặc phản hồi không streaming.
+R7: Rò dữ liệu qua retrieval/cache.
+-> Kiểm tra quyền server, cache scope và test hai tài khoản.
+R8: Lịch ôn sai do duplicate/múi giờ.
+-> Event idempotency, UTC và test lịch.
+R9: AI tạo bài tự luận khó chấm.
+-> Ưu tiên quiz objective; tự luận chỉ hỗ trợ bằng rubric và chưa dùng điểm chính thức.
+R10: Bản quyền/nguồn riêng.
+-> Quyền sử dụng, mặc định private, không vượt hạn chế truy cập và không public tự động.
+
+14.3. Definition of Done cho UC được chọn
+- Có yêu cầu, luồng và tiêu chí nghiệm thu.
+- Có UI trạng thái thành công/lỗi/loading/empty tương ứng.
+- Có API validation và object-level authorization.
+- Có schema/migration, versioning cần thiết.
+- Có unit/integration/E2E theo mức rủi ro.
+- Không có secret trong client hoặc repository.
+- Có log an toàn để điều tra lỗi.
+- Được demo trên môi trường đã ghi nhận.
+- Được cập nhật trạng thái phạm vi trong báo cáo.
+
+14.4. Đóng góp kỹ thuật có thể bảo vệ
+- Pipeline bảo toàn nguồn và locator xuyên PDF/video.
+- RAG có scope quyền, phiên bản và trích dẫn điều hướng được.
+- Tổ chức lộ trình có người học xác nhận, kiểm tra source refs.
+- Quiz theo nguồn và remediation dựa trên topic/attempt.
+- So sánh truy xuất và đánh giá câu trả lời trên bộ test có nhãn.
+Không mặc định đây là phát minh thuật toán mới. Đóng góp có thể là thiết kế, tích hợp và đánh giá một giải pháp cho bối cảnh cụ thể.
+
+===============================================================================
+15. CHECKLIST CHỐT ĐỀ TÀI
+===============================================================================
+
+[ ] Xác định người dùng thí điểm: sinh viên IT hoặc học sinh ở cấp cụ thể.
+[ ] Chốt môn và nguồn học liệu được phép sử dụng.
+[ ] Chốt số người, thời gian và ngân sách AI.
+[ ] Chốt UC trong MVP và UC mở rộng.
+[ ] Prototype nạp video/transcript trước khi cam kết nhiều nền tảng.
+[ ] Chọn mô hình/API sau thử chất lượng, chi phí và chính sách dữ liệu.
+[ ] Chốt hệ điều hành demo và thiết bị kiểm thử.
+[ ] Có bộ câu hỏi kiểm thử và người rà soát.
+[ ] Có sơ đồ dữ liệu và locator cho từng loại nguồn.
+[ ] Có quota, quyền, xóa nguồn và chống truy cập dữ liệu người khác.
+[ ] Có quy trình báo lỗi AI và sửa phiên bản nội dung.
+[ ] Có baseline và phương pháp đánh giá.
+[ ] Báo cáo phân biệt đã làm, một phần và chưa làm.
+[ ] Demo cho thấy học -> hỏi -> luyện -> ôn, không chỉ chat.
+
+KẾT LUẬN
+Hướng đề tài nên ưu tiên một sản phẩm học tập hoàn chỉnh và đáng tin trong phạm vi hẹp:
+"Người học đưa nguồn hợp lệ vào app; app giúp tổ chức bài học, hiểu nội dung, luyện tập và ôn lại đúng phần cần thiết".
+60 UC là bản đồ phát triển. Sự thuyết phục của đồ án đến từ luồng lõi chạy ổn, nguồn chính xác, kiểm soát quyền và kết quả đánh giá trung thực.
+
+HẾT TÀI LIỆU

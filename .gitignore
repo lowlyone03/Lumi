@@ -1,0 +1,62 @@
+# Environment variables (Bảo mật - Không commit lên git)
+.env
+*.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+.venv/
+env/
+ENV/
+
+# Node & Expo / React Native
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.expo/
+web-build/
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project backups & temporary archives
+_backup/
+*.zip
+*.tar.gz
+
+# Backend temporary test artifacts & uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/.pytest_cache/
+backend/test_out.txt
+backend/test_run_result.log
+backend/real_pytest_output.txt
+backend/b4_test_results.txt
+backend/report_*.xml
+*.log

@@ -1,0 +1,16 @@
+{
+  "name": "Lumi — Học theo nhịp của bạn",
+  "short_name": "Lumi",
+  "description": "Trợ lý học tập AI Lumi cho điện thoại, web và desktop.",
+  "lang": "vi",
+  "start_url": "./?device=phone",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fbfcfa",
+  "theme_color": "#2f6b4f",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

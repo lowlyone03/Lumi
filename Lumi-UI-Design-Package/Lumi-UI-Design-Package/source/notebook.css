@@ -1,0 +1,11 @@
+/* Diagonal graph paper belongs only to public product introductions. */
+html{--intro-grid-line:rgba(66,111,78,.17);--intro-grid-major:rgba(66,111,78,.08);--notebook-cell:40px;--notebook-five:200px}
+.l-landing,.mobile-welcome-paper{--notebook-paper:var(--page);--notebook-ink:var(--intro-grid-line);--notebook-major:var(--intro-grid-major);--notebook-grid:repeating-linear-gradient(78deg,var(--notebook-ink) 0 1px,transparent 1px var(--notebook-cell)),repeating-linear-gradient(168deg,var(--notebook-ink) 0 1px,transparent 1px var(--notebook-cell)),repeating-linear-gradient(78deg,var(--notebook-major) 0 1px,transparent 1px var(--notebook-five)),repeating-linear-gradient(168deg,var(--notebook-major) 0 1px,transparent 1px var(--notebook-five));background-color:var(--notebook-paper)!important;background-image:var(--notebook-grid)!important;background-attachment:fixed!important;background-position:0 0!important}
+.l-hero:before,.intro-mobile-section:before{display:none!important}
+html[data-theme] .l-landing .l-nav,html[data-theme] .l-landing .l-footer,html[data-theme] .l-landing .l-beliefs{background-color:transparent!important;backdrop-filter:none!important}
+html[data-theme] .l-landing .l-nav{background-color:var(--notebook-paper)!important;background-image:var(--notebook-grid)!important;background-attachment:fixed!important;background-position:0 0!important}
+.l-landing .l-section,.l-landing .intro-audience,.l-landing .intro-features,.l-landing .intro-mobile-section,.l-landing .l-devices,.l-landing .intro-directory,.l-landing .l-faq{background-color:transparent!important}
+@media(max-width:600px){html{--notebook-cell:30px;--notebook-five:150px}}
+
+html[data-theme=dark]{--intro-grid-line:rgba(153,187,161,.13);--intro-grid-major:rgba(153,187,161,.06)}
+html[data-theme=comfort]{--intro-grid-line:rgba(109,123,79,.16);--intro-grid-major:rgba(109,123,79,.07)}

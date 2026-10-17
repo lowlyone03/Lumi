@@ -1,0 +1,76 @@
+/* ============================================================================
+ * device.css — Lớp tối ưu khi mở Lumi trên ĐIỆN THOẠI THẬT (Android/iOS).
+ * Gói giao diện đã duyệt dùng khung 414px bo góc để *xem thử* bố cục mobile
+ * trên máy tính. Trên điện thoại thật, khung đó thừa: ở đây cho tràn màn hình,
+ * ẩn thanh xem thử và chừa vùng an toàn (tai thỏ / thanh điều hướng).
+ * Chỉ áp dụng khi html[data-device="phone"] (do device.js gắn) — web giữ nguyên.
+ * File này nạp sau cùng.
+ * ============================================================================ */
+
+html[data-device="phone"] .previewbar{display:none!important}
+
+html[data-device="phone"],
+html[data-device="phone"] body{
+  min-height:100%;
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;
+  overscroll-behavior-y:none;
+}
+
+/* Khung ứng dụng: bỏ viền, bo góc, bóng và lề của bản xem thử */
+html[data-device="phone"] .app,
+html[data-device="phone"] .mobile.app{
+  width:100%!important;
+  max-width:100%!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  min-height:100vh;
+  min-height:100dvh;
+}
+
+html[data-device="phone"] .sidebar{height:100vh;height:100dvh}
+
+/* Màn chào app mobile và màn đăng nhập/đăng ký mobile */
+html[data-device="phone"] .mobile-preview-stage,
+html[data-device="phone"] .mobile-account-stage{
+  padding:0!important;
+  min-height:100dvh;
+}
+html[data-device="phone"] .mobile-welcome-frame,
+html[data-device="phone"] .mobile-account-frame{
+  max-width:100%!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  min-height:100dvh;
+}
+
+/* Vùng an toàn: tai thỏ phía trên và thanh cử chỉ phía dưới */
+html[data-device="phone"] .topbar,
+html[data-device="phone"] .mobile-preview-toolbar,
+html[data-device="phone"] .mobile-account-frame{
+  padding-top:max(12px, env(safe-area-inset-top));
+}
+html[data-device="phone"] .bottomnav{
+  padding-bottom:max(8px, env(safe-area-inset-bottom));
+}
+
+/* Ô nhập ≥16px để Chrome Android/iOS không tự phóng to khi chạm vào */
+html[data-device="phone"] input,
+html[data-device="phone"] textarea,
+html[data-device="phone"] select{font-size:16px}
+
+/* Khi mở dạng app (đã "Thêm vào màn hình chính") */
+@media (display-mode: standalone){
+  html[data-device="phone"] body{user-select:none;-webkit-user-select:none}
+  html[data-device="phone"] input,
+  html[data-device="phone"] textarea,
+  html[data-device="phone"] [contenteditable]{user-select:text;-webkit-user-select:text}
+}
+
+/* Chấm trạng thái kết nối backend (api.js gắn data-backend) */
+html[data-backend="offline"] .topbar .avatar{box-shadow:0 0 0 2px #e7a33e}
+html[data-backend="online"] .topbar .avatar{box-shadow:0 0 0 2px #3fae74}

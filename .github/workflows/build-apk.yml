@@ -39,19 +39,26 @@ jobs:
       - name: Build Android APK with Gradle
         run: |
           cd android
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
           gradle wrapper --gradle-version 8.5
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee ../gradle-build.log
+          STATUS=${PIPESTATUS[0]}
+          if [ $STATUS -ne 0 ]; then
+            echo "❌ Build failed with exit code $STATUS"
+            exit $STATUS
+          fi
 
-      - name: Upload Build Logs on Failure
+      - name: Upload Debug Log on Failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: softprops/action-gh-release@v2
         with:
-          name: build-failure-logs
-          path: |
-            android/app/build/reports/
-            android/app/build/outputs/logs/
-          if-no-files-found: ignore
+          tag_name: debug-log
+          name: "Build Failure Debug Log"
+          body: "Compilation failed on GitHub Actions. See gradle-build.log attached."
+          files: gradle-build.log
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Rename and Prepare APK
         run: |

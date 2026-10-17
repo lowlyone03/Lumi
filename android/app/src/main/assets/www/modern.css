@@ -1,0 +1,841 @@
+/* ============================================================================
+ * LUMI AI — MODERN PRODUCTION UI/UX DESIGN SYSTEM (Web, Desktop & Mobile)
+ * Typography: Plus Jakarta Sans + Be Vietnam Pro + Lora (Full Vietnamese)
+ * ============================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+:root,
+html[data-theme="light"] {
+  --page: #f4f7f9 !important;
+  --bg: #f4f7f9 !important;
+  --surface: #ffffff !important;
+  --surface2: #f8fafc !important;
+  --surface3: #f1f5f9 !important;
+  --text: #0f172a !important;
+  --ink: #0f172a !important;
+  --secondary: #475569 !important;
+  --muted: #64748b !important;
+  --faint: #94a3b8 !important;
+  --border: #e2e8f0 !important;
+  --line: #e2e8f0 !important;
+  --accent: #0d9488 !important;
+  --green: #0d9488 !important;
+  --accent-ink: #0f766e !important;
+  --accent-soft: #ccfbf1 !important;
+  --light: #f0fdfa !important;
+  --card-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  --card-hover-shadow: 0 14px 30px -4px rgba(13, 148, 136, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.05);
+}
+
+html[data-theme="dark"] {
+  --page: #0b0f19 !important;
+  --bg: #0b0f19 !important;
+  --surface: #111827 !important;
+  --surface2: #1e293b !important;
+  --surface3: #0f172a !important;
+  --text: #f8fafc !important;
+  --ink: #f8fafc !important;
+  --secondary: #cbd5e1 !important;
+  --muted: #94a3b8 !important;
+  --faint: #64748b !important;
+  --border: #1e293b !important;
+  --line: #1e293b !important;
+  --accent: #10b981 !important;
+  --green: #10b981 !important;
+  --accent-ink: #34d399 !important;
+  --accent-soft: rgba(16, 185, 129, 0.15) !important;
+  --light: rgba(16, 185, 129, 0.12) !important;
+  --card-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.35);
+  --card-hover-shadow: 0 16px 32px -4px rgba(16, 185, 129, 0.18);
+}
+
+html[data-theme="comfort"] {
+  --page: #f2ece1 !important;
+  --bg: #f2ece1 !important;
+  --surface: #faf6ef !important;
+  --surface2: #efe8dc !important;
+  --surface3: #e6decfe0 !important;
+  --text: #292524 !important;
+  --ink: #292524 !important;
+  --secondary: #57534e !important;
+  --muted: #78716c !important;
+  --faint: #a8a29e !important;
+  --border: #e2d9c8 !important;
+  --line: #e2d9c8 !important;
+  --accent: #2f6f55 !important;
+  --green: #2f6f55 !important;
+  --accent-ink: #235340 !important;
+  --accent-soft: #dceddd !important;
+  --light: #e5f0e6 !important;
+  --card-shadow: 0 4px 16px rgba(41, 37, 36, 0.05);
+  --card-hover-shadow: 0 12px 26px rgba(47, 111, 85, 0.12);
+}
+
+/* Global Typography Polish */
+body {
+  font-family: 'Be Vietnam Pro', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 14.5px !important;
+  line-height: 1.65 !important;
+  color: var(--text) !important;
+  background: var(--page) !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+h1, h2, h3, h4, .brand, .greeting h1, .pagehead h1, .hero h2 {
+  font-family: 'Plus Jakarta Sans', 'Be Vietnam Pro', sans-serif !important;
+  color: var(--text) !important;
+  letter-spacing: -0.025em !important;
+}
+
+.pagehead h1, .greeting h1 {
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  line-height: 1.3 !important;
+}
+
+.pagehead p, .greeting p {
+  font-size: 14px !important;
+  color: var(--secondary) !important;
+  line-height: 1.6 !important;
+}
+
+/* Hide prototype banners and simulator preview bar everywhere */
+.prototype-banner,
+.previewbar {
+  display: none !important;
+}
+
+/* 100% Full Width & Viewport-filling Workspace Architecture */
+html, body {
+  width: 100% !important;
+  min-height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+}
+
+.app {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  min-height: 100vh !important;
+  display: grid !important;
+  grid-template-columns: 260px minmax(0, 1fr) !important;
+  background: var(--bg) !important;
+}
+
+.app[data-page="landing"],
+.app[data-page="auth"] {
+  grid-template-columns: 1fr !important;
+}
+
+.sidebar {
+  width: 100% !important;
+  height: 100vh !important;
+  top: 0 !important;
+  position: sticky !important;
+  box-sizing: border-box !important;
+  background: var(--surface) !important;
+  border-right: 1px solid var(--border) !important;
+  padding: 28px 20px !important;
+}
+
+.workspace {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
+  background: var(--bg) !important;
+}
+
+.topbar {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 0 clamp(24px, 3.5vw, 64px) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.main {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  flex: 1 1 auto !important;
+  padding: clamp(24px, 2.5vw, 44px) clamp(24px, 3.5vw, 64px) !important;
+}
+
+/* Modern Icon Containers & Duotone Badges (Desktop & Mobile) */
+.tileicon {
+  width: 46px !important;
+  height: 46px !important;
+  border-radius: 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.16), rgba(16, 185, 129, 0.08)) !important;
+  color: var(--accent) !important;
+  border: 1px solid rgba(13, 148, 136, 0.2) !important;
+  box-shadow: 0 4px 12px -2px rgba(13, 148, 136, 0.12) !important;
+  position: relative !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.tileicon svg {
+  width: 22px !important;
+  height: 22px !important;
+  position: static !important;
+  stroke-width: 1.85 !important;
+}
+
+.tileicon.orange,
+.feature-card:nth-child(3n+2) .tileicon {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(249, 115, 22, 0.08)) !important;
+  color: #d97706 !important;
+  border-color: rgba(245, 158, 11, 0.25) !important;
+  box-shadow: 0 4px 12px -2px rgba(245, 158, 11, 0.14) !important;
+}
+
+html[data-theme="dark"] .tileicon.orange,
+html[data-theme="dark"] .feature-card:nth-child(3n+2) .tileicon {
+  color: #fbbf24 !important;
+}
+
+.tileicon.blue,
+.feature-card:nth-child(3n+3) .tileicon {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.16), rgba(59, 130, 246, 0.08)) !important;
+  color: #4f46e5 !important;
+  border-color: rgba(79, 70, 229, 0.24) !important;
+  box-shadow: 0 4px 12px -2px rgba(79, 70, 229, 0.14) !important;
+}
+
+html[data-theme="dark"] .tileicon.blue,
+html[data-theme="dark"] .feature-card:nth-child(3n+3) .tileicon {
+  color: #818cf8 !important;
+}
+
+.feature-card:nth-child(4n) .tileicon {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.16), rgba(244, 63, 94, 0.08)) !important;
+  color: #db2777 !important;
+  border-color: rgba(236, 72, 153, 0.24) !important;
+}
+
+html[data-theme="dark"] .feature-card:nth-child(4n) .tileicon {
+  color: #f472b6 !important;
+}
+
+/* Fix feature-card layout & chevron positioning */
+.feature-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 18px !important;
+  padding: 22px !important;
+  box-shadow: var(--card-shadow) !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.feature-card:hover {
+  transform: translateY(-3px) !important;
+  border-color: var(--accent) !important;
+  box-shadow: var(--card-hover-shadow) !important;
+}
+
+.feature-card:hover .tileicon {
+  transform: scale(1.06) !important;
+}
+
+.feature-card > svg {
+  position: absolute !important;
+  right: 18px !important;
+  top: 24px !important;
+  width: 18px !important;
+  height: 18px !important;
+  color: var(--muted) !important;
+  opacity: 0.65 !important;
+}
+
+.feature-card strong {
+  font-size: 15.5px !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  margin-top: 2px !important;
+}
+
+.feature-card small {
+  font-size: 13px !important;
+  color: var(--secondary) !important;
+  line-height: 1.65 !important;
+}
+
+/* Quick Cards & Setting Cards Polish */
+.quick,
+.settingcard,
+.aicard,
+.course,
+.managed-source,
+.chatpanel {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--card-shadow) !important;
+  border-radius: 16px !important;
+}
+
+.quick {
+  padding: 18px 16px !important;
+  transition: all 0.2s ease !important;
+}
+
+.quick:hover {
+  transform: translateY(-3px) !important;
+  border-color: var(--accent) !important;
+  box-shadow: var(--card-hover-shadow) !important;
+}
+
+.quick strong {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+}
+
+.quick small {
+  font-size: 12px !important;
+  color: var(--secondary) !important;
+}
+
+/* Sidebar & Navigation Icons */
+.sidebar {
+  background: var(--surface) !important;
+  border-right: 1px solid var(--border) !important;
+}
+
+.navitem {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--secondary) !important;
+  padding: 12px 14px !important;
+  border-radius: 12px !important;
+  transition: all 0.15s ease !important;
+}
+
+.navitem svg {
+  width: 20px !important;
+  height: 20px !important;
+  stroke-width: 1.85 !important;
+}
+
+.navitem.active {
+  background: var(--light) !important;
+  color: var(--accent) !important;
+  font-weight: 700 !important;
+}
+
+/* Document Paper Typography — Native Vietnamese Serif/Sans clarity */
+.paper {
+  font-family: 'Be Vietnam Pro', 'Lora', serif !important;
+  font-size: 14.5px !important;
+  line-height: 1.85 !important;
+  color: var(--text) !important;
+  background: var(--surface) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--card-shadow) !important;
+}
+
+.paper h2 {
+  font-family: 'Plus Jakarta Sans', 'Be Vietnam Pro', sans-serif !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+}
+
+/* Chat Messages Polish */
+.msg {
+  font-size: 13.5px !important;
+  line-height: 1.75 !important;
+}
+
+.msg.user {
+  background: var(--accent) !important;
+  color: #ffffff !important;
+  border-radius: 16px 16px 4px 16px !important;
+  padding: 12px 16px !important;
+  font-weight: 500 !important;
+}
+
+.msg.assistant {
+  background: var(--surface2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px 16px 16px 4px !important;
+  padding: 16px 18px !important;
+  color: var(--text) !important;
+}
+
+/* Buttons Polish */
+.btn {
+  font-family: 'Plus Jakarta Sans', 'Be Vietnam Pro', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  padding: 10px 18px !important;
+  border-radius: 10px !important;
+  transition: all 0.18s ease !important;
+}
+
+.btn:not(.secondary):not(.ghost) {
+  background: linear-gradient(135deg, #0d9488 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.25) !important;
+}
+
+.btn:not(.secondary):not(.ghost):hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.35) !important;
+}
+
+/* ============================================================================
+ * PUBLIC LANDING PAGE (TRANG CHỦ GIỚI THIỆU NGOÀI HỆ THỐNG)
+ * ============================================================================ */
+.lumi-landing-wrapper {
+  min-height: calc(100vh - 44px);
+  background: var(--page);
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+.landing-nav {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.landing-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+.landing-links a {
+  color: var(--secondary);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.landing-links a:hover {
+  color: var(--accent);
+}
+
+.landing-hero {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 48px 32px 64px;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.landing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--light);
+  color: var(--accent);
+  border: 1px solid rgba(13, 148, 136, 0.25);
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.landing-hero h1 {
+  font-size: 46px !important;
+  font-weight: 800 !important;
+  line-height: 1.18 !important;
+  letter-spacing: -0.03em !important;
+  margin: 0 0 20px !important;
+}
+
+.landing-hero h1 span {
+  background: linear-gradient(135deg, #0d9488 0%, #2563eb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.landing-hero p {
+  font-size: 16.5px !important;
+  line-height: 1.75 !important;
+  color: var(--secondary) !important;
+  margin: 0 0 30px !important;
+  max-width: 580px;
+}
+
+.landing-cta-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.landing-cta-group .btn {
+  padding: 14px 26px !important;
+  font-size: 15px !important;
+  border-radius: 12px !important;
+}
+
+.landing-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 38px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+}
+
+.landing-stats strong {
+  display: block;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.landing-stats span {
+  font-size: 12.5px;
+  color: var(--secondary);
+}
+
+.landing-showcase {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.12);
+  position: relative;
+}
+
+.landing-section {
+  max-width: clamp(1280px, 88vw, 1860px) !important;
+  margin: 0 auto !important;
+  padding: clamp(48px, 5vw, 84px) clamp(24px, 3.5vw, 64px) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.landing-nav {
+  max-width: clamp(1280px, 88vw, 1860px) !important;
+  margin: 0 auto !important;
+  padding: clamp(16px, 2vw, 26px) clamp(24px, 3.5vw, 64px) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.landing-hero {
+  max-width: clamp(1280px, 88vw, 1860px) !important;
+  margin: 0 auto !important;
+  padding: clamp(40px, 4.5vw, 84px) clamp(24px, 3.5vw, 64px) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: clamp(36px, 3.5vw, 68px);
+}
+
+.landing-section-head {
+  text-align: center;
+  max-width: 780px;
+  margin: 0 auto 44px;
+}
+
+.landing-section-head h2 {
+  font-size: clamp(28px, 2.5vw, 42px) !important;
+  font-weight: 800 !important;
+  margin: 10px 0 14px !important;
+}
+
+.landing-section-head p {
+  font-size: clamp(15px, 1.05vw, 18px) !important;
+  color: var(--secondary) !important;
+}
+
+.landing-bento {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+  gap: clamp(18px, 1.8vw, 28px) !important;
+}
+
+.landing-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: clamp(24px, 2.2vw, 36px);
+  box-shadow: var(--card-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.landing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--card-hover-shadow);
+  border-color: var(--accent);
+}
+
+.landing-card h3 {
+  font-size: clamp(17px, 1.15vw, 21px) !important;
+  font-weight: 700 !important;
+  margin: 18px 0 10px !important;
+}
+
+.landing-card p {
+  font-size: clamp(13.5px, 0.95vw, 15.5px) !important;
+  color: var(--secondary) !important;
+  line-height: 1.75 !important;
+  margin: 0 !important;
+}
+
+/* ============================================================================
+ * FLUID RESPONSIVE WORKSPACE & COMPONENT SCALING (LẤP ĐẦY & TỰ TO RA)
+ * ============================================================================ */
+
+/* Quick Actions Grid */
+.quickgrid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
+  gap: clamp(12px, 1.2vw, 20px) !important;
+}
+
+.quick {
+  padding: clamp(14px, 1.4vw, 22px) clamp(14px, 1.4vw, 20px) !important;
+  border-radius: 14px !important;
+}
+
+/* Home Dashboard Grid */
+.homegrid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 22vw, 420px) !important;
+  gap: clamp(22px, 2.2vw, 38px) !important;
+}
+
+.hero {
+  min-height: clamp(210px, 24vh, 320px) !important;
+  padding: clamp(28px, 2.8vw, 44px) clamp(28px, 3.2vw, 52px) !important;
+  border-radius: 20px !important;
+}
+
+.hero h2 {
+  font-size: clamp(24px, 2.1vw, 36px) !important;
+  max-width: 720px !important;
+}
+
+.hero p {
+  font-size: clamp(13.5px, 0.95vw, 15.5px) !important;
+  max-width: 620px !important;
+}
+
+/* Library & Course Card Grid */
+.librarygrid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)) !important;
+  gap: clamp(16px, 1.5vw, 26px) !important;
+}
+
+.course {
+  border-radius: 16px !important;
+}
+
+/* Hub & Tools Grid (Bộ công cụ AI) */
+.feature-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+  gap: clamp(16px, 1.5vw, 24px) !important;
+}
+
+.feature-card {
+  padding: clamp(20px, 1.8vw, 28px) !important;
+  border-radius: 18px !important;
+  min-height: clamp(170px, 16vh, 220px) !important;
+}
+
+/* Statistics Grid */
+.stats-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+  gap: clamp(14px, 1.5vw, 24px) !important;
+}
+
+/* Document Reader & AI Assistant Layout */
+.readergrid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.35fr) minmax(380px, 1fr) !important;
+  gap: clamp(20px, 2vw, 32px) !important;
+}
+
+.reader {
+  border-radius: 18px !important;
+  background: var(--surface2) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.paper {
+  max-width: 980px !important;
+  width: calc(100% - 40px) !important;
+  margin: 24px auto !important;
+  padding: clamp(32px, 3.5vw, 64px) clamp(28px, 3.5vw, 56px) !important;
+  box-sizing: border-box !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06) !important;
+  font-family: 'Lora', 'Be Vietnam Pro', serif !important;
+  font-size: clamp(15px, 1.05vw, 17.5px) !important;
+  line-height: 1.85 !important;
+}
+
+.reader iframe {
+  height: clamp(680px, 78vh, 1400px) !important;
+}
+
+.chatpanel {
+  border-radius: 18px !important;
+}
+
+/* Flashcards Panel */
+.flash-panel {
+  max-width: 980px !important;
+  width: 100% !important;
+  margin: 24px auto !important;
+  padding: clamp(24px, 2.5vw, 44px) !important;
+  border-radius: 24px !important;
+}
+
+.flash-face {
+  min-height: clamp(280px, 32vh, 440px) !important;
+  padding: clamp(28px, 3vw, 54px) !important;
+  border-radius: 20px !important;
+}
+
+.flash-face h2 {
+  font-size: clamp(22px, 2vw, 32px) !important;
+}
+
+/* ============================================================================
+ * PROGRESSIVE MEDIA QUERIES FOR LARGE MONITORS (1080p, 2K, 4K)
+ * ============================================================================ */
+
+/* 1. Màn hình máy tính lớn / Full HD chuẩn (>= 1440px) */
+@media (min-width: 1440px) {
+  body {
+    font-size: 15px !important;
+  }
+  .tileicon {
+    width: 48px !important;
+    height: 48px !important;
+  }
+}
+
+/* 2. Màn hình 2K & Desktop 24 - 27 inch (>= 1680px) */
+@media (min-width: 1680px) {
+  body {
+    font-size: 15.5px !important;
+  }
+  .app:not([data-page="landing"]):not([data-page="auth"]) {
+    grid-template-columns: 280px minmax(0, 1fr) !important;
+  }
+  .sidebar {
+    padding: 34px 24px !important;
+  }
+  .navitem {
+    font-size: 14px !important;
+    padding: 14px 18px !important;
+  }
+  .tileicon {
+    width: 52px !important;
+    height: 52px !important;
+    border-radius: 16px !important;
+  }
+  .tileicon svg {
+    width: 24px !important;
+    height: 24px !important;
+  }
+  .btn {
+    font-size: 14px !important;
+    padding: 12px 20px !important;
+  }
+}
+
+/* 3. Màn hình siêu lớn / 2K Rộng / 4K (>= 2100px) */
+@media (min-width: 2100px) {
+  body {
+    font-size: 17px !important;
+  }
+  .app:not([data-page="landing"]):not([data-page="auth"]) {
+    grid-template-columns: 320px minmax(0, 1fr) !important;
+  }
+  .sidebar {
+    padding: 40px 28px !important;
+  }
+  .brand {
+    font-size: 26px !important;
+  }
+  .brandmark {
+    width: 42px !important;
+    height: 42px !important;
+  }
+  .navitem {
+    font-size: 15.5px !important;
+    padding: 16px 20px !important;
+  }
+  .tileicon {
+    width: 58px !important;
+    height: 58px !important;
+    border-radius: 18px !important;
+  }
+  .tileicon svg {
+    width: 28px !important;
+    height: 28px !important;
+  }
+  .btn {
+    font-size: 15px !important;
+    padding: 14px 24px !important;
+    border-radius: 12px !important;
+  }
+  .paper {
+    max-width: 1140px !important;
+    font-size: 19px !important;
+  }
+}
+
+/* Responsive Mobile Fallback */
+.mobile .landing-hero,
+@media (max-width: 900px) {
+  .landing-hero {
+    grid-template-columns: 1fr !important;
+    padding: 28px 20px !important;
+  }
+  .landing-hero h1 {
+    font-size: 32px !important;
+  }
+  .landing-bento {
+    grid-template-columns: 1fr !important;
+  }
+  .landing-links {
+    display: none !important;
+  }
+}
+
+.mobile .tileicon {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 12px !important;
+}
+
+.mobile .bottomnav button svg {
+  width: 21px !important;
+  height: 21px !important;
+}
+

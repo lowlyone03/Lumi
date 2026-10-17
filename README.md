@@ -98,7 +98,31 @@ Khi máy chủ khởi động thành công:
 
 Máy tính xách tay cấu hình vừa phải không cần cài đặt các bộ giả lập Android nặng nề (như Android Studio Emulator). Bạn có thể test trực tiếp trên điện thoại **OPPO A92** theo 2 cách dưới đây:
 
-### Cách 1: Kết nối chung mạng Wi-Fi (Đơn giản nhất — Không cần cáp)
+### 📦 Cách 1: Tải trực tiếp tệp cài đặt APK (`Lumi-AI.apk`) về điện thoại (Thật 100%)
+Hệ thống đã tích hợp sẵn **GitHub Actions** tự động biên dịch mã nguồn Android thành tệp cài đặt `.apk` trên máy chủ đám mây của GitHub (máy tính xách tay của bạn không cần cài đặt Java hay Android Studio nặng nề):
+1. Trên điện thoại **OPPO A92**, mở trình duyệt và truy cập mục Releases của kho lưu trữ:
+   👉 **[https://github.com/lowlyone03/Lumi/releases](https://github.com/lowlyone03/Lumi/releases)** (hoặc tab **Actions**).
+2. Tải tệp **`Lumi-AI.apk`** về máy.
+3. Mở tệp vừa tải trong thanh thông báo (hoặc Trình quản lý tệp) và bấm **"Cài đặt" (Install)**.
+4. Ứng dụng **Lumi AI** sẽ xuất hiện trực tiếp trong danh sách ứng dụng của OPPO A92 với biểu tượng chiếc lá, mở chạy độc lập có màn hình Splash Screen, thanh trạng thái riêng và không phụ thuộc vào bất kỳ trình duyệt nào.
+
+---
+
+### ⚛️ Cách 2: Chạy qua Expo Go (Chuẩn đặc tả Đồ án React Native)
+Dành cho việc bảo vệ khóa luận tốt nghiệp yêu cầu công nghệ **React Native**:
+1. Trên điện thoại **OPPO A92**, mở **Google Play Store (CH Play)**, tìm kiếm và cài đặt ứng dụng: **Expo Go** (chính thức từ Expo).
+2. Trên máy tính xách tay, mở terminal tại thư mục `mobile/`:
+   ```bash
+   cd mobile
+   npx expo start
+   ```
+3. Màn hình terminal sẽ xuất hiện một mã **QR Code**.
+4. Mở ứng dụng **Expo Go** trên OPPO A92 -> Chọn **"Scan QR code"** -> Hướng camera quét mã trên màn hình laptop:
+   Ứng dụng sẽ nạp gói JavaScript và khởi chạy ứng dụng React Native trực tiếp trên điện thoại!
+
+---
+
+### 🌐 Cách 3: Kết nối nhanh qua Wi-Fi chung (Không cần cáp)
 1. Đảm bảo laptop và điện thoại **OPPO A92** đang kết nối vào **cùng một mạng Wi-Fi**.
 2. Trên laptop, kiểm tra địa chỉ IP mạng nội bộ (LAN):
    - Mở terminal gõ: `ipconfig`
@@ -108,10 +132,10 @@ Máy tính xách tay cấu hình vừa phải không cần cài đặt các bộ
    ```
    http://192.168.39.17:8000/app/
    ```
-   *(Thay `192.168.39.17` bằng IP máy tính của bạn)*
 
-### Cách 2: Cắm cáp USB sử dụng ADB Reverse (Cực nhanh và không phụ thuộc Wi-Fi)
-Cách này giúp điện thoại kết nối thẳng qua cáp sạc USB, ổn định 100% kể cả khi Wi-Fi phòng trọ/trường học chặn kết nối giữa các máy:
+---
+
+### 🔌 Cách 4: Cắm cáp USB sử dụng ADB Reverse (Cực nhanh & Ổn định)
 1. Bật **Tùy chọn cho nhà phát triển** trên OPPO A92:
    - Vào *Cài đặt* -> *Giới thiệu về điện thoại* -> Bấm liên tục 7 lần vào *Số bản dựng (Build number)*.
    - Quay lại *Cài đặt bổ sung* -> Mở *Tùy chọn nhà phát triển* -> Bật **Gỡ lỗi USB (USB Debugging)**.
@@ -125,12 +149,12 @@ Cách này giúp điện thoại kết nối thẳng qua cáp sạc USB, ổn đ
    http://localhost:8000/app/
    ```
 
-### 📲 Cài đặt thành App Mobile toàn màn hình (PWA)
-Để giao diện hiển thị 100% toàn màn hình, biến mất thanh địa chỉ URL của trình duyệt như một ứng dụng Native thực thụ:
+---
+
+### 📲 Cài đặt thành Web App (PWA)
 1. Khi đang mở trang Lumi trên Chrome điện thoại, bấm vào biểu tượng **ba dấu chấm (⋮)** ở góc trên bên phải.
 2. Chọn **"Thêm vào Màn hình chính"** (hoặc *"Cài đặt ứng dụng"*).
 3. Bấm **Thêm**. Biểu tượng chiếc lá **Lumi** sẽ xuất hiện trên màn hình chính của OPPO A92.
-4. Chạm vào icon Lumi ngoài màn hình chính để mở app ở chế độ **Standalone Full-screen**.
 
 ---
 

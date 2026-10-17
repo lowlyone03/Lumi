@@ -201,15 +201,24 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    overflow-x: hidden !important;
     background: var(--page, var(--bg)) !important;
+  }
+
+  /* Desktop App view: lock outer viewport so left sidebar is permanently frozen */
+  html[data-entry="app"]:not([data-device="phone"]),
+  html[data-entry="app"]:not([data-device="phone"]) body {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
   }
 
   .app:not(.mobile) {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    min-height: 100vh !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
     display: grid !important;
     grid-template-columns: clamp(230px, 15vw, 270px) minmax(0, 1fr) !important;
     background: var(--page, var(--bg)) !important;
@@ -217,10 +226,26 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
 
   .app:not(.mobile) .sidebar {
     height: 100vh !important;
+    max-height: 100vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    position: relative !important;
     top: 0 !important;
-    position: sticky !important;
+    left: 0 !important;
     padding: clamp(24px, 2vw, 36px) clamp(16px, 1.4vw, 24px) !important;
     box-sizing: border-box !important;
+    border-right: 1px solid var(--line) !important;
+    background: var(--surface, #fff) !important;
+    flex-shrink: 0 !important;
+    z-index: 50 !important;
+  }
+
+  .app:not(.mobile) .sidebar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .app:not(.mobile) .sidebar::-webkit-scrollbar-thumb {
+    background: var(--border, #dce3db);
+    border-radius: 4px;
   }
 
   .app:not(.mobile) .workspace {
@@ -228,13 +253,28 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
     min-width: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    min-height: 100vh !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scroll-behavior: smooth !important;
   }
 
   .app:not(.mobile) .topbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 40 !important;
     width: 100% !important;
     padding: 0 clamp(24px, 3.2vw, 64px) !important;
     box-sizing: border-box !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    background: rgba(255, 255, 255, 0.88) !important;
+    border-bottom: 1px solid var(--line) !important;
+  }
+
+  html[data-theme="dark"] .app:not(.mobile) .topbar {
+    background: rgba(23, 26, 30, 0.88) !important;
   }
 
   .app:not(.mobile) .main {
@@ -243,7 +283,7 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
     margin: 0 !important;
     padding: clamp(22px, 2.4vw, 40px) clamp(24px, 3.2vw, 64px) !important;
     box-sizing: border-box !important;
-    flex: 1 1 auto !important;
+    flex: 1 0 auto !important;
   }
 
   /* Public Landing Edge-to-Edge */
@@ -305,6 +345,23 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
     grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr) !important;
     gap: clamp(20px, 2vw, 36px) !important;
     width: 100% !important;
+    align-items: start !important;
+  }
+
+  .readergrid .chatpanel {
+    position: sticky !important;
+    top: 92px !important;
+    height: calc(100vh - 130px) !important;
+    max-height: calc(100vh - 130px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    z-index: 30 !important;
+  }
+
+  .readergrid .chatpanel .chats {
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    max-height: none !important;
   }
 
   .reader {
@@ -358,5 +415,110 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
     font-size: 16.5px !important;
     line-height: 1.9 !important;
   }
+}
+
+/* ==========================================================================
+ * INTERACTIVE IN-TEXT CITATIONS & ORIGINAL PDF VIEWER
+ * ========================================================================== */
+
+/* Clickable Citation Badges [1], [2], [3] */
+.citation-ref-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  color: var(--green, #176957) !important;
+  background: var(--light, #eaf3ed) !important;
+  border: 1px solid rgba(23, 105, 87, 0.3) !important;
+  border-radius: 6px !important;
+  padding: 2px 6px !important;
+  margin: 0 3px !important;
+  cursor: pointer !important;
+  vertical-align: baseline !important;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.3, 1) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.citation-ref-btn:hover {
+  background: var(--green, #176957) !important;
+  color: #ffffff !important;
+  transform: translateY(-2px) scale(1.08) !important;
+  box-shadow: 0 4px 10px rgba(23, 105, 87, 0.25) !important;
+}
+
+.citation-ref-btn:active {
+  transform: translateY(0) scale(0.96) !important;
+}
+
+@keyframes citationPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(23, 105, 87, 0.7);
+    background: #176957;
+    color: #fff;
+    transform: scale(1.18);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(23, 105, 87, 0);
+    background: #176957;
+    color: #fff;
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(23, 105, 87, 0);
+    transform: scale(1);
+  }
+}
+
+.citation-active-pulse {
+  animation: citationPulse 1.4s ease-out !important;
+  background: #176957 !important;
+  color: #fff !important;
+}
+
+.doc-page-highlight {
+  animation: docPagePulse 2.5s ease-out !important;
+}
+
+@keyframes docPagePulse {
+  0% {
+    background-color: rgba(255, 235, 59, 0.4);
+    outline: 3px solid #fbc02d;
+  }
+  100% {
+    background-color: transparent;
+    outline: 3px solid transparent;
+  }
+}
+
+/* Document Mode Segmented Toggle */
+.doc-mode-toggle button {
+  transition: all 0.2s ease !important;
+}
+.doc-mode-toggle button:hover:not(.active) {
+  background: var(--surface3, #e9eee7) !important;
+}
+
+/* PDF Viewer Container */
+.pdf-viewer-wrap {
+  width: 100% !important;
+  height: calc(100vh - 210px) !important;
+  min-height: 580px !important;
+  background: #2b2e33 !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid var(--border) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.pdf-viewer-wrap iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  flex: 1 1 auto !important;
 }
 

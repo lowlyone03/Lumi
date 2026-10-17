@@ -24,7 +24,7 @@ let lumiActiveBackendDeckId = localStorage.getItem('lumi-backend-deck-id') || ''
 
 const lumiChunksCache = {};
 const lumiLoadingChunks = {};
-let lumiDocMode = 'text';
+let lumiDocMode = 'pdf';
 
 // 1. NÂNG CẤP BỘ ICON HIỆN ĐẠI (SẮC NÉT TRÊN CẢ WEB & MOBILE)
 const modernSvgMap = {
@@ -85,12 +85,24 @@ function cleanVietText(str) {
   return s;
 }
 
-function formatAIMarkdown(raw) {
+function formatAIMarkdown(raw, citations = []) {
   if (!raw) return '';
   let safe = esc(cleanVietText(raw));
   safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   safe = safe.replace(/`([^`]+)`/g, '<code style="background:var(--surface3);padding:2px 6px;border-radius:5px;font-size:12.5px">$1</code>');
-  safe = safe.replace(/\[(\d+)\]/g, '<span class="badge green" style="margin:0 2px;font-weight:700">[$1]</span>');
+  safe = safe.replace(/\[(\d+)\]/g, (match, num) => {
+    const idx = parseInt(num, 10);
+    let targetPage = idx;
+    if (citations && citations.length > 0) {
+      const c = citations.find(x => x.ordinal === idx) || citations[idx - 1];
+      if (c?.locator?.page) targetPage = c.locator.page;
+    } else {
+      const r = records[sourceIndex] || records[0];
+      const chunks = (r && lumiChunksCache[r.id]) || [];
+      if (chunks[idx - 1]?.page_number) targetPage = chunks[idx - 1].page_number;
+    }
+    return `<button type="button" class="citation-ref-btn" onclick="openCitation(${targetPage}, ${idx})" title="Nhảy tới nguồn trích dẫn [${idx}] tại Trang ${targetPage} trên bản PDF">[${num}]</button>`;
+  });
   return safe.replace(/\n/g, '<br>');
 }
 
@@ -335,7 +347,16 @@ changePage = function (d) {
   const maxPage = Math.max(1, pages.length || r?.pageCount || 1);
   readerPage = Math.min(maxPage, Math.max(1, readerPage + d));
   if (r) persist('lumi-source-page-' + r.id, readerPage);
-  render();
+
+  const iframe = document.getElementById('lumiPdfFrame');
+  if (iframe && r?.id && lumiDocMode === 'pdf') {
+    const baseSrc = `${LUMI_API_BASE}/sources/${r.id}/file`;
+    iframe.src = `${baseSrc}#page=${readerPage}&zoom=page-width`;
+    const pageNumEl = document.getElementById('pageNum');
+    if (pageNumEl) pageNumEl.textContent = `Trang ${readerPage} / ${maxPage}`;
+  } else {
+    render();
+  }
 };
 
 reader = function () {
@@ -374,11 +395,6 @@ reader = function () {
     true,
     'spark'
   )}${btn(
-    lumiDocMode === 'pdf' ? 'Chế độ: Văn bản AI' : 'Xem file PDF gốc',
-    "lumiDocMode=(lumiDocMode==='pdf'?'text':'pdf');render()",
-    true,
-    'file'
-  )}${btn(
     'Tải lại file PDF từ máy',
     'reuploadCurrentSourceFile()',
     true,
@@ -392,10 +408,10 @@ reader = function () {
 
   let paperBodyHTML = '';
   if (lumiDocMode === 'pdf' && r.id) {
-    const pdfUrl = `${LUMI_API_BASE}/sources/${r.id}/file#page=${readerPage}`;
+    const pdfUrl = `${LUMI_API_BASE}/sources/${r.id}/file#page=${readerPage}&zoom=page-width`;
     paperBodyHTML = `
-      <div style="padding:12px;background:var(--surface2);border-radius:14px">
-        <iframe src="${pdfUrl}" title="${esc(sourceTitle)}" style="width:100%;height:clamp(680px,78vh,1400px);border:1px solid var(--border);border-radius:12px;background:#fff"></iframe>
+      <div class="pdf-viewer-wrap" style="padding:10px;background:var(--surface2);border-radius:14px;box-sizing:border-box">
+        <iframe id="lumiPdfFrame" src="${pdfUrl}" title="${esc(sourceTitle)}" style="width:100%;height:calc(100vh - 270px);min-height:700px;border:1px solid var(--border);border-radius:12px;background:#fff;display:block"></iframe>
       </div>
     `;
   } else if (lumiLoadingChunks[r.id]) {
@@ -419,7 +435,7 @@ reader = function () {
       .join('<hr style="border:0;border-top:1px dashed var(--border);margin:18px 0">');
 
     paperBodyHTML = `
-      <article class="paper" style="max-width:980px;width:calc(100% - 40px);margin:20px auto;padding:clamp(32px,3.5vw,60px) clamp(28px,3.5vw,52px)">
+      <article class="paper" id="doc-page-${readerPage}" style="max-width:980px;width:calc(100% - 40px);margin:20px auto;padding:clamp(32px,3.5vw,60px) clamp(28px,3.5vw,52px)">
         <small style="color:var(--accent);font-weight:700">TRANG ${readerPage} / ${totalPages} · NỘI DUNG HỌC LIỆU</small>
         <h2 style="margin:10px 0 18px;font-size:21px">${esc(
           currentPageObj.heading || sourceTitle
@@ -471,9 +487,30 @@ reader = function () {
       readingView === 'assistant' ? 'active' : ''
     }" onclick="readingView='assistant';render()">${icon('spark')} Trợ giảng AI</button></div>` +
     `<div class="readergrid" data-view="${readingView}">` +
-    `<section class="reader"><div class="readertools"><span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${icon(
+    `<section class="reader"><div class="readertools">` +
+    `<div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1"><span style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${icon(
       'file'
-    )} ${esc(sourceTitle)}</span><span style="display:flex;align-items:center;gap:8px;flex-shrink:0"><button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="Trang trước" onclick="changePage(-1)">‹ Trang trước</button> <strong id="pageNum">Trang ${readerPage} / ${totalPages}</strong> <button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="Trang sau" onclick="changePage(1)">Trang sau ›</button></span></div>${paperBodyHTML}</section>` +
+    )} ${esc(sourceTitle)}</span><span class="badge green" style="font-size:10px;padding:3px 8px;border-radius:6px;flex-shrink:0">PDF Gốc Chuẩn</span></div>` +
+    `<div class="doc-mode-toggle" style="display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin:0 10px"><button class="${
+      lumiDocMode === 'pdf' ? 'active' : ''
+    }" style="font-size:11px;padding:5px 10px;border-radius:6px;border:0;cursor:pointer;background:${
+      lumiDocMode === 'pdf' ? 'var(--accent)' : 'transparent'
+    };color:${lumiDocMode === 'pdf' ? '#fff' : 'var(--text)'};font-weight:600" onclick="lumiDocMode='pdf';render()">${icon(
+      'file'
+    )} Bản PDF gốc (100%)</button><button class="${
+      lumiDocMode === 'text' ? 'active' : ''
+    }" style="font-size:11px;padding:5px 10px;border-radius:6px;border:0;cursor:pointer;background:${
+      lumiDocMode === 'text' ? 'var(--accent)' : 'transparent'
+    };color:${lumiDocMode === 'text' ? '#fff' : 'var(--text)'};font-weight:600" onclick="lumiDocMode='text';render()">${icon(
+      'note'
+    )} Văn bản AI</button></div>` +
+    `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="Trang trước" onclick="changePage(-1)">‹ Trang trước</button> <strong id="pageNum" style="font-size:11.5px;min-width:85px;text-align:center">Trang ${readerPage} / ${totalPages}</strong> <button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="Trang sau" onclick="changePage(1)">Trang sau ›</button>${
+      r.id
+        ? `<a class="btn secondary" href="${LUMI_API_BASE}/sources/${r.id}/file" target="_blank" title="Mở file PDF gốc toàn màn hình" style="padding:5px 9px;font-size:11.5px;text-decoration:none">${icon(
+            'link'
+          )} Phóng to</a>`
+        : ''
+    }</div></div>${paperBodyHTML}</section>` +
     `<section class="chatpanel"><div class="chatheader"><div class="aititle"><span class="tileicon" style="width:34px!important;height:34px!important;border-radius:10px!important">${icon(
       'spark'
     )}</span>Trợ giảng AI Lumi <span class="badge green" style="margin-left:auto">Trực tuyến</span></div><div class="chattabs"><button class="${
@@ -644,12 +681,42 @@ addPrototypeSource = async function () {
   }
 };
 
-openCitation = function (targetPage) {
+openCitation = function (targetPage, ordinal = 1) {
   if (targetPage) readerPage = targetPage;
   readerTab = 'chat';
   readingView = 'document';
-  go('reader');
-  toast(`Đã chuyển tới Trang ${readerPage} của tài liệu.`);
+
+  const r = records[sourceIndex] || records[0];
+  const maxPage = Math.max(1, r?.pageCount || 1);
+  if (r) persist('lumi-source-page-' + r.id, readerPage);
+
+  const iframe = document.getElementById('lumiPdfFrame');
+  if (iframe && r?.id) {
+    const baseSrc = `${LUMI_API_BASE}/sources/${r.id}/file`;
+    iframe.src = `${baseSrc}#page=${readerPage}&zoom=page-width`;
+    const pageNumEl = document.getElementById('pageNum');
+    if (pageNumEl) pageNumEl.textContent = `Trang ${readerPage} / ${maxPage}`;
+  } else {
+    render();
+  }
+
+  // Hiệu ứng phát sáng trên nút trích dẫn vừa bấm
+  document.querySelectorAll('.citation-ref-btn').forEach(btn => {
+    if (btn.textContent.trim() === `[${ordinal}]`) {
+      btn.classList.add('citation-active-pulse');
+      setTimeout(() => btn.classList.remove('citation-active-pulse'), 2500);
+    }
+  });
+
+  // Nếu đang ở chế độ text thì cuộn tới đoạn tương ứng
+  const targetEl = document.getElementById(`doc-page-${targetPage}`);
+  if (targetEl) {
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    targetEl.classList.add('doc-page-highlight');
+    setTimeout(() => targetEl.classList.remove('doc-page-highlight'), 3000);
+  }
+
+  toast(`🔍 Đang hiển thị nguồn trích dẫn [${ordinal}] tại Trang ${readerPage} trên tài liệu PDF.`);
 };
 
 messageHTML = function (m) {
@@ -659,7 +726,7 @@ messageHTML = function (m) {
     m.role === 'assistant'
       ? '<span class="label">' + icon('spark') + ' TRỢ GIẢNG LUMI AI</span>'
       : ''
-  }${m.role === 'assistant' ? formatAIMarkdown(m.text) : esc(m.text).replace(/\n/g, '<br>')}${
+  }${m.role === 'assistant' ? formatAIMarkdown(m.text, m.citations) : esc(m.text).replace(/\n/g, '<br>')}${
     m.role === 'assistant' && !m.loading
       ? `<div class="actionline compact-actions" style="margin-top:12px">${btn(
           citeLabel,
@@ -745,6 +812,7 @@ sendChat = async function (value) {
     loadingMsg.loading = false;
     loadingMsg.page = pageNum;
     loadingMsg.citeLabel = citeLabel;
+    loadingMsg.citations = citations;
 
     if (!activeSession) {
       activeSession = lumiActiveBackendConvId || uid();

@@ -191,3 +191,172 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
   .l-dash-quick-row { grid-template-columns: repeat(2, 1fr); }
   .l-dash-smart-tip { flex-direction: column; align-items: flex-start; }
 }
+
+/* ==========================================================================
+ * LUMI FLUID EDGE-TO-EDGE EXPANSION FOR LARGE & ULTRA-WIDE SCREENS
+ * ========================================================================== */
+@media (min-width: 601px) {
+  html, body {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden !important;
+    background: var(--page, var(--bg)) !important;
+  }
+
+  .app:not(.mobile) {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    min-height: 100vh !important;
+    display: grid !important;
+    grid-template-columns: clamp(230px, 15vw, 270px) minmax(0, 1fr) !important;
+    background: var(--page, var(--bg)) !important;
+  }
+
+  .app:not(.mobile) .sidebar {
+    height: 100vh !important;
+    top: 0 !important;
+    position: sticky !important;
+    padding: clamp(24px, 2vw, 36px) clamp(16px, 1.4vw, 24px) !important;
+    box-sizing: border-box !important;
+  }
+
+  .app:not(.mobile) .workspace {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 100vh !important;
+  }
+
+  .app:not(.mobile) .topbar {
+    width: 100% !important;
+    padding: 0 clamp(24px, 3.2vw, 64px) !important;
+    box-sizing: border-box !important;
+  }
+
+  .app:not(.mobile) .main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: clamp(22px, 2.4vw, 40px) clamp(24px, 3.2vw, 64px) !important;
+    box-sizing: border-box !important;
+    flex: 1 1 auto !important;
+  }
+
+  /* Public Landing Edge-to-Edge */
+  .l-landing {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .l-landing .l-nav {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 clamp(24px, 4vw, 80px) !important;
+    box-sizing: border-box !important;
+  }
+
+  .l-landing > main {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 clamp(24px, 4.5vw, 88px) !important;
+    box-sizing: border-box !important;
+  }
+
+  .l-landing .l-footer {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 34px clamp(24px, 4.5vw, 88px) !important;
+    box-sizing: border-box !important;
+  }
+
+  .l-landing .l-hero {
+    gap: clamp(40px, 4vw, 90px) !important;
+    min-height: min(720px, 80vh) !important;
+  }
+
+  .l-bento-scene {
+    max-width: clamp(520px, 38vw, 700px) !important;
+    width: 100% !important;
+  }
+
+  /* Home Dashboard Grid on Large & Ultra-wide Displays */
+  .l-home-grid {
+    grid-template-columns: minmax(0, 1fr) clamp(290px, 22vw, 390px) !important;
+    gap: clamp(22px, 2vw, 36px) !important;
+    width: 100% !important;
+  }
+
+  .l-home-primary {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .l-home-aside {
+    min-width: 0 !important;
+  }
+
+  /* Document Reader Edge-to-Edge Layout */
+  .readergrid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr) !important;
+    gap: clamp(20px, 2vw, 36px) !important;
+    width: 100% !important;
+  }
+
+  .reader {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .paper {
+    max-width: min(940px, 100% - 48px) !important;
+    margin: 24px auto !important;
+    padding: clamp(32px, 3.5vw, 60px) clamp(28px, 3.5vw, 56px) !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Courses & Shelf Grid */
+  .courses {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+    gap: clamp(16px, 1.6vw, 26px) !important;
+  }
+}
+
+/* Enhancements for Very Large Screens (Full HD, 2K, 4K) */
+@media (min-width: 1400px) {
+  .l-dash-stats {
+    gap: 16px;
+  }
+  .l-dash-stat-card {
+    padding: 16px 18px;
+  }
+  .l-dash-quick-row {
+    gap: 13px;
+  }
+  .l-dash-quick-btn {
+    padding: 14px 13px;
+  }
+}
+
+@media (min-width: 1800px) {
+  .l-dash-stats {
+    gap: 20px;
+  }
+  .l-dash-quick-row {
+    gap: 16px;
+  }
+  .l-home-grid {
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 20vw, 420px) !important;
+    gap: 40px !important;
+  }
+  .paper {
+    max-width: 1040px !important;
+    font-size: 16.5px !important;
+    line-height: 1.9 !important;
+  }
+}
+

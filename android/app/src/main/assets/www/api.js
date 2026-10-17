@@ -77,12 +77,11 @@ function cleanVietText(str) {
   let s = String(str)
     .replace(/\s+([\u0300-\u036f])/g, '$1')
     .normalize('NFC');
-  // Sửa các từ bị tách khoảng trắng sau nguyên âm có dấu khi bóc tách PDF
+  // Sửa các từ bị tách khoảng trắng sau nguyên âm có dấu khi bóc tách PDF (vd: tố t -> tốt, cấ u -> cấu)
   s = s.replace(
-    /([àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴ])\s+(c|ch|m|n|ng|nh|p|t|i|u|y)\b/g,
+    /([àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴ])\s+(ch|c|ng|nh|n|m|p|t|i|u|y)\b/gi,
     '$1$2'
   );
-  s = s.replace(/([A-ZÀ-Ỵ])\s+([A-ZÀ-Ỵ])\b/g, '$1$2');
   return s;
 }
 

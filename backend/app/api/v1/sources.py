@@ -407,32 +407,54 @@ async def get_source_chunks(
 
 
 def _build_pdf_bytes_from_text(title: str, text_content: Optional[str] = None) -> bytes:
-    """Tạo tệp PDF chuẩn nhiều trang bằng PyMuPDF để phục vụ kiểm thử trực tiếp trên giao diện Web/Desktop"""
+    """Tạo tệp PDF chuẩn nhiều trang bằng PyMuPDF với font Unicode hỗ trợ tiếng Việt đầy đủ."""
     doc = fitz.open()
     body = text_content or (
-        f"Chương 3: Cấu trúc dữ liệu Cây Nhị Phân và Cây Cân Bằng ({title})\n\n"
-        "3.1. Cây tìm kiếm nhị phân (Binary Search Tree - BST):\n"
-        "Cây tìm kiếm nhị phân là cấu trúc dữ liệu cây trong đó mỗi nút có tối đa hai cây con (trái và phải). "
-        "Mọi khóa thuộc cây con trái đều nhỏ hơn khóa của nút gốc, và mọi khóa thuộc cây con phải đều lớn hơn khóa của nút gốc. "
-        "Khi cây cân bằng, độ phức tạp trung bình của các thao tác tìm kiếm, chèn và xóa là O(log n). "
-        "Tuy nhiên, nếu chèn dãy phần tử đã sắp xếp tăng dần hoặc giảm dần, BST sẽ suy biến thành danh sách liên kết đơn với độ phức tạp trường hợp xấu nhất là O(n).\n\n"
-        "3.2. Cây Đỏ - Đen (Red-Black Tree) và Cây AVL:\n"
-        "Cây Đỏ-Đen sử dụng thuộc tính màu (Đỏ hoặc Đen) cùng các phép xoay trái (Left Rotate) và xoay phải (Right Rotate) "
-        "để đảm bảo không có đường đi nào từ gốc đến lá dài gấp đôi đường đi ngắn nhất. "
-        "Nhờ đó chiều cao của cây luôn giữ ở mức O(log n) trong mọi trường hợp.\n\n"
-        "3.3. Cấu trúc B-Tree trong Cơ sở dữ liệu và Hệ thống tệp:\n"
-        "Khác với BST chỉ lưu một khóa mỗi nút, B-Tree cho phép một nút chứa nhiều khóa và có nhiều nhánh con. "
-        "Thiết kế này giúp giảm chiều cao cây đáng kể và tối ưu hóa số lần đọc/ghi khối đĩa (Disk I/O) trong hệ quản trị cơ sở dữ liệu PostgreSQL."
+        f"Chương 1: Cơ sở dữ liệu Quan hệ, Khóa và Ràng buộc ({title})\n\n"
+        "1.1. Mô hình Cơ sở dữ liệu Quan hệ và Khóa chính (Primary Key):\n"
+        "Khóa chính là một hoặc một tập hợp các thuộc tính giúp xác định duy nhất một bản ghi trong bảng. "
+        "Khóa chính không bao giờ được phép nhận giá trị NULL. Mỗi bảng quan hệ chuẩn luôn có một khóa chính "
+        "để định danh dữ liệu độc bản.\n\n"
+        "1.2. Khóa ngoại (Foreign Key) và Ràng buộc toàn vẹn tham chiếu:\n"
+        "Khóa ngoại dùng để liên kết giữa hai bảng và bảo đảm ràng buộc toàn vẹn tham chiếu: mọi giá trị khóa ngoại khác NULL "
+        "bắt buộc phải tham chiếu tới một giá trị khóa chính đang tồn tại trong bảng quan hệ cha. "
+        "Nhờ đó tránh được hiện tượng dữ liệu mồ côi (orphan records).\n\n"
+        "Chương 2: Cây tìm kiếm nhị phân (Binary Search Tree - BST) và Cây cân bằng:\n\n"
+        "2.1. Cây tìm kiếm nhị phân (BST):\n"
+        "Trong cây tìm kiếm nhị phân, mọi nút bên trái có khóa nhỏ hơn nút cha và mọi nút bên phải có khóa lớn hơn nút cha. "
+        "Độ phức tạp tìm kiếm trung bình là O(log n). Tuy nhiên trong trường hợp xấu nhất, cây có thể suy biến thành danh sách liên kết với O(n).\n\n"
+        "2.2. Cây Đỏ - Đen (Red-Black Tree) và B-Tree:\n"
+        "Cây Đỏ-Đen và B-Tree tự động cân bằng chiều cao ở mức O(log n), giúp hệ quản trị CSDL PostgreSQL tối ưu hóa truy vấn chỉ mục."
     )
     paragraphs = [p.strip() for p in body.split("\n\n") if p.strip()]
+
+    font_file = None
+    for candidate in [
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
+        "C:/Windows/Fonts/times.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]:
+        if Path(candidate).exists():
+            font_file = candidate
+            break
+
     for idx in range(0, max(1, len(paragraphs)), 2):
         page = doc.new_page()
         page_num = (idx // 2) + 1
-        page.insert_text((50, 60), f"{title} - Trang {page_num}", fontsize=14)
+        fn = "helv"
+        if font_file:
+            try:
+                page.insert_font(fontname="vnfont", fontfile=font_file)
+                fn = "vnfont"
+            except Exception:
+                fn = "helv"
+
+        page.insert_text((50, 60), f"{title} - Trang {page_num}", fontname=fn, fontsize=14)
         y = 100
         for p in paragraphs[idx : idx + 2]:
             rect = fitz.Rect(50, y, 545, y + 300)
-            page.insert_textbox(rect, p, fontsize=11)
+            page.insert_textbox(rect, p, fontname=fn, fontsize=11)
             y += 180
     out = doc.tobytes()
     doc.close()

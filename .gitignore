@@ -49,6 +49,7 @@ Thumbs.db
 _backup/
 *.zip
 *.tar.gz
+*.apk
 
 # Backend temporary test artifacts & uploads
 backend/uploads/*

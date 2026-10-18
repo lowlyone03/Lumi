@@ -324,31 +324,31 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
     width: 100% !important;
   }
 
-  /* Home Dashboard Grid on Large & Ultra-wide Displays */
-  .l-home-grid {
+  /* Home Dashboard Grid on Large & Ultra-wide Displays (Only when not in mobile preview) */
+  .app:not(.mobile) .l-home-grid {
     grid-template-columns: minmax(0, 1fr) clamp(290px, 22vw, 390px) !important;
     gap: clamp(22px, 2vw, 36px) !important;
     width: 100% !important;
   }
 
-  .l-home-primary {
+  .app:not(.mobile) .l-home-primary {
     min-width: 0 !important;
     width: 100% !important;
   }
 
-  .l-home-aside {
+  .app:not(.mobile) .l-home-aside {
     min-width: 0 !important;
   }
 
   /* Document Reader Edge-to-Edge Layout */
-  .readergrid {
+  .app:not(.mobile) .readergrid {
     grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr) !important;
     gap: clamp(20px, 2vw, 36px) !important;
     width: 100% !important;
     align-items: start !important;
   }
 
-  .readergrid .chatpanel {
+  .app:not(.mobile) .readergrid .chatpanel {
     position: sticky !important;
     top: 92px !important;
     height: calc(100vh - 130px) !important;
@@ -358,18 +358,18 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
     z-index: 30 !important;
   }
 
-  .readergrid .chatpanel .chats {
+  .app:not(.mobile) .readergrid .chatpanel .chats {
     flex: 1 1 auto !important;
     overflow-y: auto !important;
     max-height: none !important;
   }
 
-  .reader {
+  .app:not(.mobile) .reader {
     width: 100% !important;
     min-width: 0 !important;
   }
 
-  .paper {
+  .app:not(.mobile) .paper {
     max-width: min(940px, 100% - 48px) !important;
     margin: 24px auto !important;
     padding: clamp(32px, 3.5vw, 60px) clamp(28px, 3.5vw, 56px) !important;
@@ -377,7 +377,7 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
   }
 
   /* Courses & Shelf Grid */
-  .courses {
+  .app:not(.mobile) .courses {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
     gap: clamp(16px, 1.6vw, 26px) !important;
   }
@@ -874,6 +874,149 @@ html[data-theme=dark] .check-badge { background: #133a2d !important; color: #34d
   font-size: 11.5px !important;
   padding: 7px 11px !important;
   border-radius: 8px !important;
+}
+
+/* Tối ưu hiển thị thẻ học liệu & khóa học trên Mobile / Bố cục điện thoại (Sửa lỗi ép chữ dọc) */
+.mobile .l-recent-modern-card,
+html[data-device="phone"] .l-recent-modern-card,
+.mobile .l-source-item,
+html[data-device="phone"] .l-source-item {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 13px !important;
+  padding: 15px !important;
+}
+
+.mobile .l-recent-card-left,
+html[data-device="phone"] .l-recent-card-left,
+.mobile .l-source-left,
+html[data-device="phone"] .l-source-left {
+  width: 100% !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+}
+
+.mobile .l-recent-doc-details,
+html[data-device="phone"] .l-recent-doc-details,
+.mobile .l-source-body,
+html[data-device="phone"] .l-source-body {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.mobile .l-recent-doc-title-row,
+html[data-device="phone"] .l-recent-doc-title-row {
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+}
+
+.mobile .l-recent-doc-title,
+html[data-device="phone"] .l-recent-doc-title,
+.mobile .l-source-title,
+html[data-device="phone"] .l-source-title {
+  white-space: normal !important;
+  word-break: break-word !important;
+  line-height: 1.4 !important;
+}
+
+.mobile .l-recent-doc-meta,
+html[data-device="phone"] .l-recent-doc-meta,
+.mobile .l-source-meta,
+html[data-device="phone"] .l-source-meta {
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  white-space: normal !important;
+  font-size: 11px !important;
+}
+
+.mobile .l-recent-card-actions,
+html[data-device="phone"] .l-recent-card-actions,
+.mobile .l-source-actions,
+html[data-device="phone"] .l-source-actions {
+  width: 100% !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  padding-top: 10px !important;
+  border-top: 1px solid var(--border) !important;
+  justify-content: flex-start !important;
+  margin-top: 4px !important;
+}
+
+.mobile .l-recent-read-btn,
+html[data-device="phone"] .l-recent-read-btn,
+.mobile .l-recent-mini-btn,
+html[data-device="phone"] .l-recent-mini-btn {
+  flex: 1 1 auto !important;
+  justify-content: center !important;
+  text-align: center !important;
+  min-height: 38px !important;
+}
+
+.mobile .courses,
+html[data-device="phone"] .courses,
+.mobile .librarygrid,
+html[data-device="phone"] .librarygrid,
+.mobile .course-modern-grid,
+html[data-device="phone"] .course-modern-grid {
+  grid-template-columns: 1fr !important;
+  gap: 16px !important;
+}
+
+@media (max-width: 768px) {
+  .l-recent-modern-card,
+  .l-source-item {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 13px !important;
+    padding: 15px !important;
+  }
+  .l-recent-card-left,
+  .l-source-left {
+    width: 100% !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+  .l-recent-doc-details,
+  .l-source-body {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .l-recent-doc-title,
+  .l-source-title {
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.4 !important;
+  }
+  .l-recent-doc-meta,
+  .l-source-meta {
+    flex-wrap: wrap !important;
+    white-space: normal !important;
+  }
+  .l-recent-card-actions,
+  .l-source-actions {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding-top: 10px !important;
+    border-top: 1px solid var(--border) !important;
+    justify-content: flex-start !important;
+  }
+  .l-recent-read-btn,
+  .l-recent-mini-btn {
+    flex: 1 1 auto !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+  .courses,
+  .librarygrid,
+  .course-modern-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
 }
 
 /* ==========================================================================

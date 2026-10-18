@@ -145,24 +145,128 @@ function formatAIMarkdown(raw, citations = []) {
   return safe.replace(/\n/g, '<br>');
 }
 
-async function lumiFetch(path, options = {}) {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {})
-  };
-  if (lumiToken) {
-    headers['Authorization'] = `Bearer ${lumiToken}`;
+const LUMI_SUPABASE_CLOUD_URL = 'https://baenwfcstfywrbanweks.supabase.co';
+const LUMI_SUPABASE_ANON_KEY = 'sb_publishable_C82eWeOiVaRJIeceH_ebqw_1ckwnuSP';
+
+async function lumiSupabaseDirectRPC(path, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+  let body = {};
+  try {
+    if (options.body) body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+  } catch {}
+  let action = '';
+  let payload = { ...body };
+
+  if (path.startsWith('/me/web-login')) {
+    action = 'web_login';
+  } else if (path.startsWith('/sources') && path.includes('/chunks')) {
+    action = 'get_chunks';
+    const match = path.match(/\/sources\/([^/]+)\/chunks/);
+    if (match) payload.source_id = match[1];
+  } else if (path.startsWith('/sources')) {
+    const match = path.match(/\/sources\/([^/]+)/);
+    if (method === 'DELETE' && match) {
+      action = 'delete_source';
+      payload.source_id = match[1];
+    } else {
+      action = 'list_sources';
+    }
+  } else if (path.startsWith('/notes')) {
+    const match = path.match(/\/notes\/([^/]+)/);
+    if (method === 'POST') {
+      action = 'create_note';
+    } else if (method === 'PATCH' && match) {
+      action = 'update_note';
+      payload.note_id = match[1];
+    } else if (method === 'DELETE' && match) {
+      action = 'delete_note';
+      payload.note_id = match[1];
+    } else {
+      action = 'list_notes';
+    }
+  } else if (path.startsWith('/courses')) {
+    if (method === 'POST') action = 'create_course';
+    else action = 'list_courses';
+  } else if (path.startsWith('/flashcards/decks')) {
+    if (path.includes('/cards')) {
+      if (method === 'POST') {
+        action = 'create_card';
+        const match = path.match(/\/decks\/([^/]+)\/cards/);
+        if (match) payload.deck_id = match[1];
+      } else {
+        action = 'list_cards';
+      }
+    } else {
+      if (method === 'POST') action = 'create_deck';
+      else action = 'list_decks';
+    }
+  } else if (path.startsWith('/flashcards/cards')) {
+    const match = path.match(/\/cards\/([^/]+)/);
+    if (method === 'PATCH' && match) {
+      action = 'update_card';
+      payload.card_id = match[1];
+    } else if (method === 'DELETE' && match) {
+      action = 'delete_card';
+      payload.card_id = match[1];
+    }
+  } else if (path.startsWith('/flashcards/due')) {
+    action = 'list_cards';
   }
-  const response = await fetch(`${LUMI_API_BASE}${path}`, {
-    ...options,
-    headers
+
+  if (!action) throw new Error('Yêu cầu chưa hỗ trợ trực tiếp Supabase Cloud: ' + path);
+
+  const res = await fetch(`${LUMI_SUPABASE_CLOUD_URL}/rest/v1/rpc/lumi_cloud_api`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': LUMI_SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${LUMI_SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify({ p_action: action, p_payload: payload })
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const msg = data?.error?.message || data?.detail || `HTTP ${response.status}`;
-    throw new Error(msg);
+  if (!res.ok) throw new Error(`Supabase Cloud HTTP ${res.status}`);
+  const rpcResult = await res.json();
+  return rpcResult;
+}
+
+async function lumiFetch(path, options = {}) {
+  // 1. Thử gọi máy chủ FastAPI (Localhost, LAN hoặc Cloudflare Tunnel)
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3500);
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    };
+    if (lumiToken && !lumiToken.startsWith('supabase-direct')) {
+      headers['Authorization'] = `Bearer ${lumiToken}`;
+    }
+    const response = await fetch(`${LUMI_API_BASE}${path}`, {
+      ...options,
+      headers,
+      signal: ctrl.signal
+    });
+    clearTimeout(timer);
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      lumiBackendConnected = true;
+      updatePreviewStatusBanner();
+      return data;
+    }
+  } catch (err) {
+    // Máy tính đã tắt hoặc server nội bộ không chạy -> Chuyển sang kết nối trực tiếp Supabase Đám Mây 24/7
   }
-  return data;
+
+  // 2. TỰ ĐỘNG CHUYỂN SANG SUPABASE CLOUD 24/7 (KHI TẮT MÁY TÍNH VẪN DÙNG BÌNH THƯỜNG)
+  try {
+    const cloudData = await lumiSupabaseDirectRPC(path, options);
+    lumiBackendConnected = true;
+    updatePreviewStatusBanner();
+    return cloudData;
+  } catch (cloudErr) {
+    console.warn('Lỗi kết nối Supabase Cloud:', cloudErr);
+    throw cloudErr;
+  }
 }
 
 // Giao diện mới tự quản lý thanh trên cùng; ở đây chỉ gắn chấm trạng thái kết nối backend.
@@ -1311,6 +1415,44 @@ sendChat = async function (value) {
     // Cập nhật câu trả lời của AI vào giao diện mà không làm xao động PDF
     replaceLoadingMsgDOM(loadingMsg);
   } catch (err) {
+    // KHI MÁY TÍNH TẮT: Tự động gọi trực tiếp Radox AI Cloud (gemini-3.6-flash) 24/7
+    try {
+      const activeRec = records[sourceIndex] || records[0];
+      const chunks = (activeRec && lumiChunksCache[activeRec.id]) || [];
+      const contextSnippet = chunks.slice(0, 4).map((c, i) => `[${i+1}] Trang ${c.page_number || c.locator?.page || (i+1)}: ${c.content}`).join('\n\n');
+      const sysPrompt = `Bạn là Trợ giảng Lumi AI (Khóa luận tốt nghiệp FBU). Hãy trả lời sinh viên một cách ân cần, súc tích, chính xác bằng tiếng Việt chuẩn NFC.\n${contextSnippet ? 'Nội dung giáo trình liên quan:\n' + contextSnippet + '\nHãy trích dẫn số trang theo định dạng [1], [2] khi giải thích.' : ''}`;
+
+      const aiRes = await fetch('https://radoxai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer cc_h3u4s1WpAre2w5DYSterZYcHlwMRyFb9PfjKcaYxUJgwpeOL'
+        },
+        body: JSON.stringify({
+          model: 'gemini-3.6-flash',
+          messages: [
+            { role: 'system', content: sysPrompt },
+            { role: 'user', content: text }
+          ],
+          temperature: 0.3,
+          max_tokens: 1200
+        })
+      });
+      if (aiRes.ok) {
+        const aiJson = await aiRes.json();
+        const reply = aiJson?.choices?.[0]?.message?.content || 'Đã nhận được phản hồi.';
+        loadingMsg.text = cleanVietText(reply);
+        loadingMsg.loading = false;
+        loadingMsg.page = readerPage || 1;
+        loadingMsg.citeLabel = `Trợ giảng Đám Mây · Trang ${loadingMsg.page}`;
+        saveChatHistoryForCurrentSource();
+        replaceLoadingMsgDOM(loadingMsg);
+        return;
+      }
+    } catch (aiErr) {
+      console.warn('Lỗi gọi trực tiếp Radox AI:', aiErr);
+    }
+
     loadingMsg.text = `Không thể kết nối máy chủ AI: ${err.message}. Vui lòng thử lại.`;
     loadingMsg.loading = false;
     replaceLoadingMsgDOM(loadingMsg);

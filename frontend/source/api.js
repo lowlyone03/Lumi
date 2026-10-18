@@ -13,21 +13,37 @@
 // Chỉ khi mở file trực tiếp (file://) mới dùng localhost:8000 mặc định.
 let LUMI_API_BASE = /^https?:$/.test(window.location.protocol)
   ? `${window.location.origin}/api/v1`
-  : (localStorage.getItem('lumi-api-base') || 'http://192.168.39.17:8000/api/v1');
+  : (localStorage.getItem('lumi-api-base') || 'https://neighborhood-cove-marks-fred.trycloudflare.com/api/v1');
 
 async function resolveBestBackendUrlForMobile() {
   if (/^https?:$/.test(window.location.protocol)) return;
+  let dynamicCloudBase = '';
+  try {
+    const cfgCtrl = new AbortController();
+    const cfgTimer = setTimeout(() => cfgCtrl.abort(), 2200);
+    const cfgRes = await fetch(`https://raw.githubusercontent.com/lowlyone03/Lumi/main/tunnel-config.json?t=${Date.now()}`, { signal: cfgCtrl.signal });
+    clearTimeout(cfgTimer);
+    if (cfgRes.ok) {
+      const cfg = await cfgRes.json();
+      if (cfg && cfg.api_base) dynamicCloudBase = cfg.api_base;
+    }
+  } catch {}
+
   const candidates = [
+    dynamicCloudBase,
+    'https://neighborhood-cove-marks-fred.trycloudflare.com/api/v1',
     localStorage.getItem('lumi-api-base'),
     'http://192.168.39.17:8000/api/v1',
     'http://100.120.76.189:8000/api/v1',
     'http://localhost:8000/api/v1'
-  ].filter(Boolean);
+  ].filter((v, i, a) => v && a.indexOf(v) === i);
+
   for (const base of candidates) {
     try {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 1800);
-      const res = await fetch(`${base.replace(/\/api\/v1$/, '')}/health`, { signal: ctrl.signal });
+      const timer = setTimeout(() => ctrl.abort(), 2500);
+      const rootUrl = base.replace(/\/api\/v1\/?$/, '/');
+      const res = await fetch(rootUrl, { signal: ctrl.signal });
       clearTimeout(timer);
       if (res.ok) {
         LUMI_API_BASE = base;

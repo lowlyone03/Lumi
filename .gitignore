@@ -50,6 +50,7 @@ _backup/
 *.zip
 *.tar.gz
 *.apk
+*.exe
 
 # Backend temporary test artifacts & uploads
 backend/uploads/*

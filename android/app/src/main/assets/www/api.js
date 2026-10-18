@@ -1631,8 +1631,8 @@ function renderModernCourseCard(c, i) {
       </div>
     </div>
   `;
-}
-courseCard = renderModernCourseCard;
+// Keep original responsive courseCard from core.js
+// courseCard = renderModernCourseCard;
 
 // 6. NÂNG CẤP QUIZ, KHÓA HỌC, FLASHCARD SM-2 & QUOTA THẬT
 quizSetup = function () {

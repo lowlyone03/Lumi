@@ -102,3 +102,83 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
   display: inline-flex;
   align-items: center;
 }
+
+
+/* ==========================================================================
+ * TRÀN VIỀN TOÀN MÀN HÌNH (FULL-WIDTH FLUID LAYOUT CHO MÀY TÍNH / MÀN HÌNH LỚN)
+ * ========================================================================== */
+.app:not(.mobile) {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+}
+
+.app:not(.mobile) .workspace {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.app:not(.mobile) .topbar {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 0 clamp(24px, 3.5vw, 64px) !important;
+}
+
+.app:not(.mobile) .main {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 30px clamp(24px, 3.5vw, 64px) 40px !important;
+  box-sizing: border-box !important;
+}
+
+.app:not(.mobile) .l-home-welcome {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.app:not(.mobile) .l-home-grid {
+  width: 100% !important;
+  max-width: 100% !important;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 22vw, 380px) !important;
+  gap: clamp(24px, 2.5vw, 42px) !important;
+}
+
+.app:not(.mobile) .homegrid {
+  width: 100% !important;
+  max-width: 100% !important;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 22vw, 380px) !important;
+  gap: clamp(24px, 2.5vw, 42px) !important;
+}
+
+.app:not(.mobile) .courses {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+  gap: clamp(16px, 1.8vw, 26px) !important;
+}
+
+.app:not(.mobile) .librarygrid {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+  gap: clamp(16px, 1.8vw, 26px) !important;
+}
+
+.app:not(.mobile) .readergrid {
+  width: 100% !important;
+  max-width: 100% !important;
+  grid-template-columns: minmax(0, 1.25fr) minmax(340px, 1fr) !important;
+  gap: clamp(18px, 2vw, 32px) !important;
+}
+
+.app:not(.mobile) .p-planner-layout {
+  width: 100% !important;
+  max-width: 100% !important;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 24vw, 380px) !important;
+  gap: clamp(20px, 2vw, 36px) !important;
+}
+
+.app:not(.mobile) .p-flash-layout {
+  width: 100% !important;
+  max-width: 100% !important;
+  grid-template-columns: 280px minmax(0, 1fr) !important;
+  gap: clamp(20px, 2vw, 36px) !important;
+}

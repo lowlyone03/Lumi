@@ -237,6 +237,7 @@ async def get_course_detail(
 
 @router.post("/{course_id}/curriculum-draft", response_model=APIResponse[CurriculumDraftResponse], status_code=status.HTTP_201_CREATED)
 @router.post("/{course_id}/curriculum/draft", response_model=APIResponse[CurriculumDraftResponse], status_code=status.HTTP_201_CREATED)
+@router.post("/{course_id}/curriculum/generate", response_model=APIResponse[CurriculumDraftResponse], status_code=status.HTTP_201_CREATED)
 async def generate_curriculum_draft(
     course_id: UUID,
     req: GenerateCurriculumDraftRequest,

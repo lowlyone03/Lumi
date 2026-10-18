@@ -11,9 +11,32 @@
 // Điều này giúp điện thoại truy cập qua IP LAN (vd: http://192.168.1.5:8000/app/)
 // hoặc qua `adb reverse` (http://localhost:8000/app/) đều gọi đúng backend.
 // Chỉ khi mở file trực tiếp (file://) mới dùng localhost:8000 mặc định.
-const LUMI_API_BASE = /^https?:$/.test(window.location.protocol)
+let LUMI_API_BASE = /^https?:$/.test(window.location.protocol)
   ? `${window.location.origin}/api/v1`
-  : 'http://localhost:8000/api/v1';
+  : (localStorage.getItem('lumi-api-base') || 'http://192.168.39.17:8000/api/v1');
+
+async function resolveBestBackendUrlForMobile() {
+  if (/^https?:$/.test(window.location.protocol)) return;
+  const candidates = [
+    localStorage.getItem('lumi-api-base'),
+    'http://192.168.39.17:8000/api/v1',
+    'http://100.120.76.189:8000/api/v1',
+    'http://localhost:8000/api/v1'
+  ].filter(Boolean);
+  for (const base of candidates) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 1800);
+      const res = await fetch(`${base.replace(/\/api\/v1$/, '')}/health`, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        LUMI_API_BASE = base;
+        try { localStorage.setItem('lumi-api-base', base); } catch {}
+        return;
+      }
+    } catch {}
+  }
+}
 
 let lumiToken = localStorage.getItem('lumi-jwt-token') || '';
 let isUserLoggedIn = localStorage.getItem('lumi-logged-in') === 'true';
@@ -264,8 +287,64 @@ async function syncFlashcardsFromBackend() {
   }
 }
 
+async function syncNotesFromBackend() {
+  try {
+    const res = await lumiFetch('/notes?limit=50');
+    const serverNotes = res.data || [];
+    if (serverNotes.length > 0) {
+      const mapped = serverNotes.map(n => ({
+        id: n.id,
+        backendId: n.id,
+        title: cleanVietText(n.title || 'Ghi chú học tập'),
+        body: cleanVietText(n.body || n.quote || ''),
+        kind: n.kind || 'note',
+        page: n.locator?.page || 1,
+        sourceId: n.source_id
+      }));
+      notebooks.splice(0, notebooks.length, ...mapped);
+      saveAllNotes();
+    }
+  } catch (err) {
+    console.warn('Đồng bộ Ghi chú:', err);
+  }
+}
+
+async function syncCoursesFromBackend() {
+  try {
+    const res = await lumiFetch('/courses');
+    const serverCourses = res.data || [];
+    if (serverCourses.length > 0) {
+      serverCourses.forEach(sc => {
+        const titleClean = cleanVietText(sc.title);
+        const existing = [...courses, ...extraCourses].find(
+          c => c.backendId === sc.id || c.title.toLowerCase() === titleClean.toLowerCase()
+        );
+        if (existing) {
+          existing.backendId = sc.id;
+        } else {
+          extraCourses.push({
+            backendId: sc.id,
+            title: titleClean,
+            cover: titleClean,
+            tag: 'Khóa học cá nhân',
+            subtitle: cleanVietText(sc.goal || sc.description || 'Lộ trình học tập cá nhân hóa'),
+            progress: sc.completion_percent || 15,
+            lessons: `${sc.completed_lessons || 1} / ${Math.max(4, sc.total_lessons || 4)} bài`,
+            blue: extraCourses.length % 2 === 1
+          });
+        }
+      });
+      persist('sf-courses', extraCourses);
+      persist('lumi-default-courses', courses);
+    }
+  } catch (err) {
+    console.warn('Đồng bộ Khóa học:', err);
+  }
+}
+
 async function initLumiBackendSession(showNotice = false) {
   try {
+    await resolveBestBackendUrlForMobile();
     const email = userProfile?.email || 'an.nguyen@sv.edu.vn';
     const displayName = userProfile?.name || 'Nguyễn Văn An';
     const loginRes = await lumiFetch('/me/web-login', {
@@ -283,7 +362,11 @@ async function initLumiBackendSession(showNotice = false) {
       }
       updatePreviewStatusBanner();
       await ensureBackendDefaultSource();
-      await syncFlashcardsFromBackend();
+      await Promise.all([
+        syncFlashcardsFromBackend(),
+        syncNotesFromBackend(),
+        syncCoursesFromBackend()
+      ]);
       render();
       if (showNotice) {
         toast(`Chào mừng ${userProfile.name} quay trở lại Lumi!`);
@@ -317,6 +400,364 @@ submitAuth = function () {
 // ============================================================================
 // 5. TRÌNH ĐỌC TÀI LIỆU THẬT & TRỢ GIẢNG AI HYBRID RAG (ĐÃ SỬA LỖI PHẢN HỒI AI)
 // ============================================================================
+// ============================================================================
+// 5. TRÌNH ĐỌC TÀI LIỆU THẬT & TRỢ GIẢNG AI HYBRID RAG (ZERO-FLICKER & LỊCH SỬ CHAT)
+// ============================================================================
+
+function getSourceChatKey(sourceId) {
+  return 'lumi-chat-source-' + (sourceId || 'default');
+}
+
+function loadChatHistoryForSource(sourceId) {
+  try {
+    const raw = localStorage.getItem(getSourceChatKey(sourceId));
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.messages) && data.messages.length > 0) {
+        chatMessages = data.messages;
+        lumiActiveBackendConvId = data.convId || '';
+        activeSession = data.sessionId || lumiActiveBackendConvId || uid();
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn('Không thể nạp lịch sử chat:', e);
+  }
+  chatMessages = [];
+  lumiActiveBackendConvId = '';
+  activeSession = null;
+  return false;
+}
+
+function saveChatHistoryForCurrentSource() {
+  const activeRec = records[sourceIndex] || records[0];
+  const sourceId = activeRec?.id || lumiActiveBackendSourceId;
+  if (!sourceId) return;
+  try {
+    localStorage.setItem(
+      getSourceChatKey(sourceId),
+      JSON.stringify({
+        convId: lumiActiveBackendConvId,
+        sessionId: activeSession,
+        messages: chatMessages
+      })
+    );
+  } catch (e) {}
+
+  if (chatMessages.length > 0) {
+    const firstUserMsg = chatMessages.find(m => m.role === 'user');
+    const title = firstUserMsg
+      ? firstUserMsg.text.slice(0, 55)
+      : activeRec?.title || 'Hội thoại học tập';
+    if (!activeSession) activeSession = lumiActiveBackendConvId || uid();
+    let s = sessions.find(x => x.id === activeSession);
+    if (!s) {
+      s = { id: activeSession, title, messages: [], sources: [sourceId], timestamp: Date.now() };
+      sessions.unshift(s);
+    }
+    s.title = title;
+    s.messages = chatMessages.map(m => ({ ...m }));
+    s.timestamp = Date.now();
+    persist('lumi-chats', sessions);
+  }
+}
+
+function startNewChatSession() {
+  const activeRec = records[sourceIndex] || records[0];
+  const sourceId = activeRec?.id || lumiActiveBackendSourceId;
+  activeSession = uid();
+  lumiActiveBackendConvId = '';
+  chatMessages = [];
+  if (sourceId) {
+    localStorage.removeItem(getSourceChatKey(sourceId));
+  }
+  renderChatContainerOnly();
+  toast('Đã khởi tạo phiên hỏi đáp mới cùng Trợ giảng Lumi.');
+}
+
+function openChatHistoryModal() {
+  const activeRec = records[sourceIndex] || records[0];
+  const sourceId = activeRec?.id || lumiActiveBackendSourceId;
+  const sourceSessions = sessions.filter(
+    s => (s.sources && s.sources.includes(sourceId)) || s.id === activeSession
+  );
+
+  let body = '';
+  if (sourceSessions.length === 0 && chatMessages.length === 0) {
+    body =
+      '<p style="color:var(--secondary);padding:14px 0">Chưa có lịch sử hội thoại trên tài liệu này. Bạn có thể đặt câu hỏi ở khung chat bên phải để bắt đầu lưu lại!</p>';
+  } else {
+    body = `
+      <div style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:var(--secondary)">Các phiên trao đổi với Trợ giảng AI trên tài liệu này:</span>
+        <button class="btn secondary" style="font-size:11px;padding:5px 10px" onclick="closeModal();startNewChatSession()">+ Hội thoại mới</button>
+      </div>
+      <div style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:9px">
+    `;
+    sourceSessions.forEach(s => {
+      const isCurrent = s.id === activeSession;
+      const count = s.messages?.length || 0;
+      const timeStr = s.timestamp
+        ? new Date(s.timestamp).toLocaleTimeString('vi-VN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            day: '2-digit',
+            month: '2-digit'
+          })
+        : 'Gần đây';
+      body += `
+        <div style="background:var(--surface2);border:1px solid ${
+          isCurrent ? 'var(--accent)' : 'var(--border)'
+        };border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div style="flex:1;min-width:0;cursor:pointer" onclick="closeModal();resumeSpecificChat('${s.id}')">
+            <strong style="display:block;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(
+              s.title || 'Cuộc trò chuyện'
+            )}</strong>
+            <small style="color:var(--faint);font-size:11px">${count} tin nhắn · ${timeStr} ${
+        isCurrent ? '· <span style="color:var(--accent);font-weight:600">Đang mở</span>' : ''
+      }</small>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn ${isCurrent ? 'secondary' : ''}" style="font-size:11px;padding:5px 10px" onclick="closeModal();resumeSpecificChat('${s.id}')">Mở</button>
+            <button class="btn secondary" style="font-size:11px;padding:5px 8px;color:#ef4444" onclick="deleteSpecificChat('${s.id}')" title="Xóa phiên này">✕</button>
+          </div>
+        </div>
+      `;
+    });
+    body += '</div>';
+  }
+
+  showModal(`
+    <h2 id="modalTitle">Lịch sử hỏi đáp Trợ giảng Lumi</h2>
+    <p>Xem lại các thắc mắc và giải đáp trước đây trên tài liệu <strong>${esc(
+      cleanVietText(activeRec?.title || '')
+    )}</strong>.</p>
+    ${body}
+    <div class="modalactions" style="margin-top:18px">
+      <button class="btn" onclick="closeModal()">Đóng</button>
+    </div>
+  `);
+}
+
+function resumeSpecificChat(sessionId) {
+  const s = sessions.find(x => x.id === sessionId);
+  if (!s) return;
+  activeSession = s.id;
+  lumiActiveBackendConvId = s.id;
+  chatMessages = (s.messages || []).map(m => ({ ...m }));
+  saveChatHistoryForCurrentSource();
+  renderChatContainerOnly();
+  toast('Đã nạp lại phiên trò chuyện: "' + (s.title || '').slice(0, 30) + '..."');
+}
+
+function deleteSpecificChat(sessionId) {
+  sessions = sessions.filter(x => x.id !== sessionId);
+  persist('lumi-chats', sessions);
+  if (activeSession === sessionId) {
+    startNewChatSession();
+  } else {
+    openChatHistoryModal();
+  }
+}
+
+let currentPdfDoc = null;
+let lastLoadedPdfUrl = '';
+
+async function renderPdfDocumentViaPdfJs(pdfUrl, initialPage = 1) {
+  const viewport = document.getElementById('pdfScrollViewport');
+  if (!viewport) return;
+
+  if (lastLoadedPdfUrl === pdfUrl && currentPdfDoc) {
+    jumpToPdfPage(initialPage);
+    return;
+  }
+
+  viewport.innerHTML =
+    '<div style="color:#94a3b8;padding:40px;text-align:center;font-size:13px">⏳ Đang nạp bản PDF chuẩn 100% với công nghệ hiển thị trang mượt mà...</div>';
+
+  try {
+    if (typeof pdfjsLib === 'undefined') {
+      throw new Error('PDF.js library not loaded');
+    }
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
+
+    const loadingTask = pdfjsLib.getDocument({
+      url: pdfUrl,
+      disableWorker: window.location.protocol === 'file:',
+      cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+      cMapPacked: true
+    });
+
+    currentPdfDoc = await loadingTask.promise;
+    lastLoadedPdfUrl = pdfUrl;
+    const numPages = currentPdfDoc.numPages;
+
+    const r = records[sourceIndex];
+    if (r) {
+      r.pageCount = numPages;
+      r.meta = `${numPages} trang · Đã đồng bộ đám mây`;
+      saveRecords();
+    }
+
+    viewport.innerHTML = '';
+
+    for (let p = 1; p <= numPages; p++) {
+      const pageCard = document.createElement('div');
+      pageCard.className = 'pdf-page-card';
+      pageCard.id = `pdf-page-card-${p}`;
+      pageCard.innerHTML = `<div class="pdf-page-badge">Trang ${p} / ${numPages}</div><canvas id="pdf-canvas-${p}"></canvas>`;
+      viewport.appendChild(pageCard);
+
+      renderSinglePdfPage(currentPdfDoc, p);
+    }
+
+    const pageNumEl = document.getElementById('pageNum');
+    if (pageNumEl) pageNumEl.textContent = `Trang ${initialPage} / ${numPages}`;
+
+    setupPdfScrollObserver(viewport, numPages);
+
+    if (initialPage > 1) {
+      setTimeout(() => jumpToPdfPage(initialPage), 250);
+    }
+  } catch (err) {
+    console.warn('PDF.js render fallback to iframe:', err);
+    viewport.innerHTML = `<iframe id="lumiPdfFrame" src="${pdfUrl}#page=${initialPage}&zoom=page-width" style="width:100%;height:100%;border:0;display:block"></iframe>`;
+  }
+}
+
+async function renderSinglePdfPage(pdfDoc, pageNum) {
+  try {
+    const page = await pdfDoc.getPage(pageNum);
+    const canvas = document.getElementById(`pdf-canvas-${pageNum}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const desiredWidth = Math.min(840, window.innerWidth > 900 ? 760 : window.innerWidth - 60);
+    const viewport = page.getViewport({ scale: 1 });
+    const scale = (desiredWidth / viewport.width) * 1.5;
+    const scaledViewport = page.getViewport({ scale });
+
+    canvas.width = scaledViewport.width;
+    canvas.height = scaledViewport.height;
+    canvas.style.width = `${scaledViewport.width / 1.5}px`;
+    canvas.style.height = `${scaledViewport.height / 1.5}px`;
+
+    await page.render({
+      canvasContext: ctx,
+      viewport: scaledViewport
+    }).promise;
+  } catch (e) {
+    console.warn(`Lỗi vẽ trang PDF ${pageNum}:`, e);
+  }
+}
+
+function setupPdfScrollObserver(viewport, totalPages) {
+  let isScrolling = null;
+  viewport.addEventListener('scroll', () => {
+    clearTimeout(isScrolling);
+    isScrolling = setTimeout(() => {
+      const cards = viewport.querySelectorAll('.pdf-page-card');
+      let visiblePage = readerPage;
+      let minDiff = Infinity;
+      const viewTop = viewport.scrollTop;
+      cards.forEach(c => {
+        const p = parseInt(c.id.replace('pdf-page-card-', ''), 10);
+        const diff = Math.abs(c.offsetTop - viewTop);
+        if (diff < minDiff) {
+          minDiff = diff;
+          visiblePage = p;
+        }
+      });
+      if (visiblePage !== readerPage) {
+        readerPage = visiblePage;
+        const r = records[sourceIndex];
+        if (r) persist('lumi-source-page-' + r.id, readerPage);
+        const pageNumEl = document.getElementById('pageNum');
+        if (pageNumEl) pageNumEl.textContent = `Trang ${readerPage} / ${totalPages}`;
+      }
+    }, 120);
+  });
+}
+
+function jumpToPdfPage(pageNo) {
+  const r = records[sourceIndex] || records[0];
+  const maxPage = Math.max(1, currentPdfDoc?.numPages || r?.pageCount || 9);
+  readerPage = Math.min(maxPage, Math.max(1, pageNo));
+  if (r) persist('lumi-source-page-' + r.id, readerPage);
+
+  const pageNumEl = document.getElementById('pageNum');
+  if (pageNumEl) pageNumEl.textContent = `Trang ${readerPage} / ${maxPage}`;
+
+  if (lumiDocMode === 'pdf') {
+    const pageCard = document.getElementById(`pdf-page-card-${readerPage}`);
+    if (pageCard) {
+      pageCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      pageCard.classList.add('page-citation-focus');
+      setTimeout(() => pageCard.classList.remove('page-citation-focus'), 3000);
+    } else {
+      const iframe = document.getElementById('lumiPdfFrame');
+      if (iframe) {
+        const base = iframe.src.split('#')[0].split('?')[0];
+        iframe.src = `${base}?t=${Date.now()}#page=${readerPage}&zoom=page-width`;
+      }
+    }
+  } else {
+    const textEl = document.getElementById(`doc-page-${readerPage}`);
+    if (textEl) {
+      textEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      textEl.classList.add('doc-page-highlight');
+      setTimeout(() => textEl.classList.remove('doc-page-highlight'), 3000);
+    }
+  }
+}
+
+function switchReaderTab(tab) {
+  readerTab = tab;
+  const notesTabEl = document.getElementById('readerNotesTab');
+  const chatTabEl = document.getElementById('readerChatTab');
+  if (notesTabEl && chatTabEl) {
+    notesTabEl.style.display = tab === 'notes' ? 'block' : 'none';
+    chatTabEl.style.display = tab === 'chat' ? 'flex' : 'none';
+    document.querySelectorAll('.chattabs button').forEach(b => {
+      b.classList.toggle(
+        'active',
+        (b.textContent.includes('Hỏi đáp') && tab === 'chat') ||
+          (b.textContent.includes('Ghi chú') && tab === 'notes')
+      );
+    });
+    return;
+  }
+  render();
+}
+
+function switchDocMode(mode) {
+  lumiDocMode = mode;
+  const pdfWrap = document.getElementById('lumiPdfWrapper');
+  const textWrap = document.getElementById('lumiTextWrapper');
+  if (pdfWrap && textWrap) {
+    pdfWrap.style.display = mode === 'pdf' ? 'flex' : 'none';
+    textWrap.style.display = mode === 'text' ? 'block' : 'none';
+    document.querySelectorAll('.doc-mode-toggle button').forEach(b => {
+      const isActive =
+        (b.textContent.includes('Bản PDF') && mode === 'pdf') ||
+        (b.textContent.includes('Văn bản') && mode === 'text');
+      b.classList.toggle('active', isActive);
+      b.style.background = isActive ? 'var(--accent)' : 'transparent';
+      b.style.color = isActive ? '#fff' : 'var(--text)';
+    });
+    if (mode === 'pdf') {
+      const activeRec = records[sourceIndex] || records[0];
+      const isRealUUID = activeRec?.id && /^[0-9a-f-]{36}$/i.test(activeRec.id);
+      const realPdfId = isRealUUID ? activeRec.id : (lumiActiveBackendSourceId || null);
+      if (realPdfId) {
+        renderPdfDocumentViaPdfJs(`${LUMI_API_BASE}/sources/${realPdfId}/file`, readerPage);
+      }
+    }
+    return;
+  }
+  render();
+}
+
 viewSource = async function (i) {
   sourceIndex = i;
   const r = records[i];
@@ -328,7 +769,10 @@ viewSource = async function (i) {
   lumiActiveBackendSourceId = r.backendId || r.id;
   localStorage.setItem('lumi-backend-source-id', lumiActiveBackendSourceId);
   chatSourceIds = [r.id];
-  lumiActiveBackendConvId = '';
+
+  // Khôi phục lịch sử chat đã lưu của tài liệu này
+  loadChatHistoryForSource(r.id);
+
   readerTab = 'chat';
   readingView = 'document';
   readerPage = saved('lumi-source-page-' + r.id, 1);
@@ -336,30 +780,16 @@ viewSource = async function (i) {
     go('video');
     return;
   }
+  lastLoadedPdfUrl = '';
   go('reader');
   await loadSourceChunks(r.id);
 };
 
 changePage = function (d) {
   const r = records[sourceIndex] || records[0];
-  const chunks = r ? lumiChunksCache[r.id] || [] : [];
-  const pages = getPagesFromChunks(chunks);
-  const maxPage = Math.max(1, pages.length || r?.pageCount || 1);
-  readerPage = Math.min(maxPage, Math.max(1, readerPage + d));
-  if (r) persist('lumi-source-page-' + r.id, readerPage);
-
-  const iframe = document.getElementById('lumiPdfFrame');
-  const isRealUUID = r?.id && /^[0-9a-f-]{36}$/i.test(r.id);
-  const realPdfId = isRealUUID ? r.id : (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null);
-
-  if (iframe && realPdfId && lumiDocMode === 'pdf') {
-    const baseSrc = `${LUMI_API_BASE}/sources/${realPdfId}/file`;
-    iframe.src = `${baseSrc}#page=${readerPage}&zoom=page-width`;
-    const pageNumEl = document.getElementById('pageNum');
-    if (pageNumEl) pageNumEl.textContent = `Trang ${readerPage} / ${maxPage}`;
-  } else {
-    render();
-  }
+  const maxPage = Math.max(1, currentPdfDoc?.numPages || r?.pageCount || 9);
+  const newPage = Math.min(maxPage, Math.max(1, readerPage + d));
+  jumpToPdfPage(newPage);
 };
 
 reader = function () {
@@ -373,13 +803,17 @@ reader = function () {
     loadSourceChunks(r.id);
   }
 
+  // Nạp lịch sử chat nếu chưa có
+  if (!chatMessages.length && r.id) {
+    loadChatHistoryForSource(r.id);
+  }
+
   const chunks = lumiChunksCache[r.id] || [];
   const pages = getPagesFromChunks(chunks);
-  const totalPages = Math.max(1, pages.length || r.pageCount || 1);
+  const totalPages = Math.max(1, currentPdfDoc?.numPages || pages.length || r.pageCount || (r.title.includes('03') ? 9 : 2));
   if (readerPage > totalPages) readerPage = 1;
   if (readerPage < 1) readerPage = 1;
 
-  const currentPageObj = pages[readerPage - 1] || pages[0] || null;
   const sourceTitle = cleanVietText(r.title || 'Tài liệu học tập');
   const activeSourceNames =
     chatSourceIds
@@ -387,105 +821,85 @@ reader = function () {
       .filter(Boolean)
       .join(', ') || sourceTitle;
 
-  const bar = `<div class="actionline reader-extra">${btn(
-    'Chọn nguồn học liệu',
-    'chooseChatSources()',
-    true,
-    'folder'
-  )}${btn('Lịch sử hỏi đáp', "go('history')", true, 'clock')}${btn(
-    'Tóm tắt tài liệu',
-    `askPreset('Tóm tắt chi tiết nội dung chính của tài liệu ${esc(sourceTitle)}')`,
-    true,
-    'spark'
-  )}${btn(
-    'Tải lại file PDF từ máy',
-    'reuploadCurrentSourceFile()',
-    true,
-    'plus'
-  )}${btn('Ghi chú nhanh', "editNotebook(null,'highlight')", true, 'note')}${btn(
-    'Đánh dấu hoàn thành',
-    'completeLesson()',
-    true,
-    'check'
-  )}</div>`;
+  // Thanh công cụ hiện đại (Ảnh số 2) với các icon màu bắt mắt
+  const bar = `
+    <div class="reader-extra-modern">
+      <button class="lumi-tool-pill" onclick="chooseChatSources()" title="Chọn tài liệu làm ngữ cảnh cho AI">
+        <span class="tool-icon-badge folder-badge">${icon('folder')}</span>
+        <span>Chọn nguồn học liệu</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="openChatHistoryModal()" title="Xem lại các câu hỏi và đoạn chat trước">
+        <span class="tool-icon-badge history-badge">${icon('clock')}</span>
+        <span>Lịch sử hỏi đáp</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="askPreset('Tóm tắt chi tiết nội dung chính của tài liệu ${esc(sourceTitle)}')" title="Nhờ AI tóm tắt tài liệu này">
+        <span class="tool-icon-badge spark-badge">${icon('spark')}</span>
+        <span>Tóm tắt tài liệu</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="reuploadCurrentSourceFile()" title="Tải tệp PDF từ máy tính của bạn">
+        <span class="tool-icon-badge upload-badge">${icon('plus')}</span>
+        <span>Tải lại file PDF từ máy</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="editNotebook(null,'highlight')" title="Ghi chú nhanh ý quan trọng">
+        <span class="tool-icon-badge note-badge">${icon('note')}</span>
+        <span>Ghi chú nhanh</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="completeLesson()" title="Đánh dấu đã hoàn thành bài học này">
+        <span class="tool-icon-badge check-badge">${icon('check')}</span>
+        <span>Đánh dấu hoàn thành</span>
+      </button>
+    </div>
+  `;
 
-  let paperBodyHTML = '';
   const isRealUUID = r.id && /^[0-9a-f-]{36}$/i.test(r.id);
   const realPdfId = isRealUUID ? r.id : (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null);
+  const pdfUrl = realPdfId ? `${LUMI_API_BASE}/sources/${realPdfId}/file` : '';
 
-  if (lumiDocMode === 'pdf' && realPdfId) {
-    const pdfUrl = `${LUMI_API_BASE}/sources/${realPdfId}/file#page=${readerPage}&zoom=page-width`;
-    paperBodyHTML = `
-      <div class="pdf-viewer-wrap" style="padding:10px;background:var(--surface2);border-radius:14px;box-sizing:border-box">
-        <iframe id="lumiPdfFrame" src="${pdfUrl}" title="${esc(sourceTitle)}" style="width:100%;height:calc(100vh - 270px);min-height:700px;border:1px solid var(--border);border-radius:12px;background:#fff;display:block"></iframe>
+  // Khung xem bản PDF gốc bằng Canvas (Zero-Flicker)
+  const pdfViewerWrapHTML = `
+    <div class="pdf-viewer-wrap" id="lumiPdfWrapper" style="display:${lumiDocMode === 'pdf' ? 'flex' : 'none'}">
+      <div class="pdf-scroll-viewport" id="pdfScrollViewport">
+        <div style="color:#94a3b8;padding:40px;text-align:center;font-size:13px">Đang chuẩn bị hiển thị tài liệu...</div>
       </div>
-    `;
-  } else if (lumiDocMode === 'pdf' && !realPdfId) {
-    paperBodyHTML = `
-      <article class="paper" style="max-width:980px;width:calc(100% - 40px);margin:20px auto;text-align:center;padding:48px 24px">
-        <div style="font-size:42px;margin-bottom:12px">📄</div>
-        <small style="color:var(--accent);font-weight:700">CHẾ ĐỘ XEM BẢN PDF GỐC 100%</small>
-        <h2 style="margin:12px 0 10px;font-size:22px">${esc(sourceTitle)}</h2>
-        <p style="color:var(--secondary);max-width:540px;margin:0 auto 24px;line-height:1.8">
-          Nguồn này đang dùng dữ liệu trích xuất mẫu. Để trải nghiệm <strong>trình đọc nguyên bản PDF chuẩn 100%</strong> (giữ nguyên từng trang, phông chữ, bảng biểu, hình vẽ và mộc dấu), bạn hãy tải tệp PDF thật từ máy tính lên Lumi nhé.
-        </p>
-        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-          <button class="btn" onclick="reuploadCurrentSourceFile()">${icon('plus')} Tải lên tệp PDF từ máy tính</button>
-          <button class="btn secondary" onclick="lumiDocMode='text';render()">${icon('note')} Chuyển sang đọc Văn bản AI</button>
-        </div>
-      </article>
-    `;
-  } else if (lumiLoadingChunks[r.id]) {
-    paperBodyHTML = `
-      <article class="paper">
-        <small>ĐANG ĐỒNG BỘ NỘI DUNG TÀI LIỆU...</small>
-        <h2>${esc(sourceTitle)}</h2>
-        <p>Hệ thống đang tải nội dung các trang của tài liệu...</p>
-      </article>
-    `;
-  } else if (currentPageObj) {
-    const paragraphsHTML = currentPageObj.blocks
-      .map(block =>
-        block
-          .split(/\n+/)
-          .map(line => cleanVietText(line).trim())
-          .filter(Boolean)
-          .map(line => `<p style="text-align:justify;line-height:1.85;margin:12px 0">${esc(line)}</p>`)
-          .join('')
-      )
-      .join('<hr style="border:0;border-top:1px dashed var(--border);margin:18px 0">');
+    </div>
+  `;
 
-    paperBodyHTML = `
-      <article class="paper" id="doc-page-${readerPage}" style="max-width:980px;width:calc(100% - 40px);margin:20px auto;padding:clamp(32px,3.5vw,60px) clamp(28px,3.5vw,52px)">
-        <small style="color:var(--accent);font-weight:700">TRANG ${readerPage} / ${totalPages} · NỘI DUNG HỌC LIỆU</small>
-        <h2 style="margin:10px 0 18px;font-size:21px">${esc(
-          currentPageObj.heading || sourceTitle
-        )}</h2>
-        <div class="doc-real-content">${paragraphsHTML}</div>
-        <div class="actionline" style="margin-top:24px">
-          <button class="citation" onclick="askPreset('Giải thích chi tiết nội dung Trang ${readerPage} của tài liệu ${esc(
-      sourceTitle
-    )}')">${icon('spark')}Nhờ AI giải thích Trang ${readerPage}</button>
-          <button class="citation" onclick="askPreset('Tạo 3 câu hỏi ôn tập từ nội dung Trang ${readerPage}')">${icon(
-      'quiz'
-    )}Tạo câu hỏi từ Trang ${readerPage}</button>
-        </div>
-        <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:24px">
-          Trang ${readerPage} / ${totalPages} · ${esc(sourceTitle)}
+  // Khung xem Văn bản AI (liệt kê toàn bộ các trang để cuộn mượt khi bấm trích dẫn)
+  const allPagesTextHTML = pages.length > 0 ? pages.map(pObj => {
+    const paras = pObj.blocks
+      .map(block => block.split(/\n+/).map(l => cleanVietText(l).trim()).filter(Boolean).map(l => `<p style="text-align:justify;line-height:1.85;margin:12px 0">${esc(l)}</p>`).join(''))
+      .join('<hr style="border:0;border-top:1px dashed var(--border);margin:18px 0">');
+    return `
+      <article class="paper" id="doc-page-${pObj.page}" style="max-width:980px;width:calc(100% - 40px);margin:20px auto;padding:clamp(28px,3.5vw,52px)">
+        <small style="color:var(--accent);font-weight:700">TRANG ${pObj.page} / ${totalPages} · NỘI DUNG HỌC LIỆU</small>
+        <h2 style="margin:10px 0 18px;font-size:21px">${esc(pObj.heading || sourceTitle)}</h2>
+        <div class="doc-real-content">${paras}</div>
+        <div class="actionline" style="margin-top:20px">
+          <button class="citation" onclick="askPreset('Giải thích chi tiết nội dung Trang ${pObj.page} của tài liệu ${esc(sourceTitle)}')">${icon('spark')} Nhờ AI giải thích Trang ${pObj.page}</button>
+          <button class="citation" onclick="askPreset('Tạo 3 câu hỏi ôn tập từ nội dung Trang ${pObj.page}')">${icon('quiz')} Tạo câu hỏi từ Trang ${pObj.page}</button>
         </div>
       </article>
     `;
-  } else {
-    paperBodyHTML = `
-      <article class="paper" style="max-width:980px;width:calc(100% - 40px);margin:20px auto">
-        <small>TÀI LIỆU HỌC TẬP</small>
-        <h2>${esc(sourceTitle)}</h2>
-        <p>Hãy chọn tệp PDF từ máy tính để Lumi hiển thị đầy đủ các trang của tài liệu này.</p>
-        <div class="actionline">
-          ${btn('Chọn tệp PDF từ máy tính', 'reuploadCurrentSourceFile()', false, 'plus')}
-        </div>
-      </article>
-    `;
+  }).join('') : `
+    <article class="paper" style="max-width:980px;width:calc(100% - 40px);margin:20px auto;text-align:center;padding:40px">
+      <h2>${esc(sourceTitle)}</h2>
+      <p style="color:var(--secondary)">Đang đồng bộ các trang văn bản...</p>
+    </article>
+  `;
+
+  const textViewerWrapHTML = `
+    <div id="lumiTextWrapper" style="display:${lumiDocMode === 'text' ? 'block' : 'none'};max-height:calc(100vh - 220px);overflow-y:auto">
+      ${allPagesTextHTML}
+    </div>
+  `;
+
+  // Tự động kích hoạt vẽ PDF bằng PDF.js sau khi DOM đã được gắn
+  if (pdfUrl) {
+    setTimeout(() => {
+      if (lumiDocMode === 'pdf') {
+        renderPdfDocumentViaPdfJs(pdfUrl, readerPage);
+      }
+    }, 40);
   }
 
   return (
@@ -516,50 +930,53 @@ reader = function () {
       lumiDocMode === 'pdf' ? 'active' : ''
     }" style="font-size:11px;padding:5px 10px;border-radius:6px;border:0;cursor:pointer;background:${
       lumiDocMode === 'pdf' ? 'var(--accent)' : 'transparent'
-    };color:${lumiDocMode === 'pdf' ? '#fff' : 'var(--text)'};font-weight:600" onclick="lumiDocMode='pdf';render()">${icon(
+    };color:${lumiDocMode === 'pdf' ? '#fff' : 'var(--text)'};font-weight:600" onclick="switchDocMode('pdf')">${icon(
       'file'
     )} Bản PDF gốc (100%)</button><button class="${
       lumiDocMode === 'text' ? 'active' : ''
     }" style="font-size:11px;padding:5px 10px;border-radius:6px;border:0;cursor:pointer;background:${
       lumiDocMode === 'text' ? 'var(--accent)' : 'transparent'
-    };color:${lumiDocMode === 'text' ? '#fff' : 'var(--text)'};font-weight:600" onclick="lumiDocMode='text';render()">${icon(
+    };color:${lumiDocMode === 'text' ? '#fff' : 'var(--text)'};font-weight:600" onclick="switchDocMode('text')">${icon(
       'note'
     )} Văn bản AI</button></div>` +
     `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="Trang trước" onclick="changePage(-1)">‹ Trang trước</button> <strong id="pageNum" style="font-size:11.5px;min-width:85px;text-align:center">Trang ${readerPage} / ${totalPages}</strong> <button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="Trang sau" onclick="changePage(1)">Trang sau ›</button>${
-  realPdfId
-    ? `<a class="btn secondary" href="${LUMI_API_BASE}/sources/${realPdfId}/file" target="_blank" title="Mở file PDF gốc toàn màn hình" style="padding:5px 9px;font-size:11.5px;text-decoration:none">${icon(
-        'link'
-      )} Phóng to</a>`
-    : ''
-}</div></div>${paperBodyHTML}</section>` +
+      realPdfId
+        ? `<a class="btn secondary" href="${LUMI_API_BASE}/sources/${realPdfId}/file" target="_blank" title="Mở file PDF gốc trong tab mới" style="padding:5px 9px;font-size:11.5px;text-decoration:none">${icon(
+            'link'
+          )} Phóng to</a>`
+        : ''
+    }</div></div>${pdfViewerWrapHTML}${textViewerWrapHTML}</section>` +
     `<section class="chatpanel"><div class="chatheader"><div class="aititle"><span class="tileicon" style="width:34px!important;height:34px!important;border-radius:10px!important">${icon(
       'spark'
-    )}</span>Trợ giảng AI Lumi <span class="badge green" style="margin-left:auto">Trực tuyến</span></div><div class="chattabs"><button class="${
+    )}</span>Trợ giảng AI Lumi <span class="badge green">Trực tuyến</span><div class="chat-action-badge-row"><button class="chat-mini-action-btn" onclick="startNewChatSession()" title="Bắt đầu cuộc trò chuyện mới">${icon(
+      'plus'
+    )} Hỏi mới</button><button class="chat-mini-action-btn" onclick="openChatHistoryModal()" title="Xem lịch sử trò chuyện trên tài liệu này">${icon(
+      'clock'
+    )} Lịch sử</button></div></div><div class="chattabs"><button class="${
       readerTab === 'chat' ? 'active' : ''
-    }" onclick="readerTab='chat';render()">Hỏi đáp AI</button><button class="${
+    }" onclick="switchReaderTab('chat')">Hỏi đáp AI</button><button class="${
       readerTab === 'notes' ? 'active' : ''
-    }" onclick="readerTab='notes';render()">Ghi chú bài học</button></div></div>` +
-    (readerTab === 'notes'
-      ? `<div style="padding:18px;flex:1"><p style="font-size:12.5px;color:var(--secondary);line-height:1.7">Ghi lại các ý quan trọng theo cách hiểu của bạn. Ghi chú được lưu và đồng bộ vào tài khoản.</p><textarea class="notearea" id="noteEditor" aria-label="Nội dung ghi chú">${esc(
-          note
-        )}</textarea><button class="btn" onclick="saveNote()">${icon(
-          'check'
-        )}Lưu ghi chú</button></div>`
-      : `<div class="chats" id="chats"><div class="msg assistant"><span class="label">${icon(
-          'spark'
-        )} TRỢ GIẢNG LUMI AI</span>Chào <strong>${esc(
-          userProfile.name
-        )}</strong>! Mình đang đồng hành cùng bạn trên tài liệu <strong>${esc(
-          sourceTitle
-        )}</strong> (${totalPages} trang).<br>Bạn có thể hỏi bất kỳ câu hỏi nào hoặc chọn gợi ý dưới đây nhé:<div class="suggestions"><button onclick="askPreset('Tóm tắt các nội dung chính trong tài liệu ${esc(
-          sourceTitle
-        )}')">Tóm tắt nội dung chính</button><button onclick="askPreset('Liệt kê các yêu cầu và mốc thời gian quan trọng nhất trong tài liệu này')">Các yêu cầu quan trọng</button></div></div>${chatMessages
-          .map(messageHTML)
-          .join(
-            ''
-          )}</div><div class="chatcompose"><form onsubmit="event.preventDefault();sendChat()"><input id="chatInput" aria-label="Hỏi trợ giảng AI" placeholder="Đặt câu hỏi bất kỳ cho Lumi AI..."><button class="btn" aria-label="Gửi câu hỏi" type="submit">${icon(
-          'send'
-        )}</button></form><small>Trợ giảng AI trả lời trực tiếp dựa trên nội dung học liệu của bạn</small></div>`) +
+    }" onclick="switchReaderTab('notes')">Ghi chú bài học</button></div></div>` +
+    `<div id="readerNotesTab" style="padding:18px;flex:1;display:${readerTab === 'notes' ? 'block' : 'none'}"><p style="font-size:12.5px;color:var(--secondary);line-height:1.7">Ghi lại các ý quan trọng theo cách hiểu của bạn. Ghi chú được lưu và đồng bộ vào tài khoản.</p><textarea class="notearea" id="noteEditor" aria-label="Nội dung ghi chú">${esc(
+      note
+    )}</textarea><button class="btn" onclick="saveNote()">${icon(
+      'check'
+    )}Lưu ghi chú</button></div>` +
+    `<div id="readerChatTab" style="display:${readerTab === 'chat' ? 'flex' : 'none'};flex-direction:column;flex:1;min-height:0"><div class="chats" id="chats"><div class="msg assistant"><span class="label">${icon(
+      'spark'
+    )} TRỢ GIẢNG LUMI AI</span>Chào <strong>${esc(
+      userProfile.name
+    )}</strong>! Mình đang đồng hành cùng bạn trên tài liệu <strong>${esc(
+      sourceTitle
+    )}</strong> (${totalPages} trang).<br>Bạn có thể hỏi bất kỳ câu hỏi nào hoặc chọn gợi ý dưới đây nhé:<div class="suggestions"><button onclick="askPreset('Tóm tắt các nội dung chính trong tài liệu ${esc(
+      sourceTitle
+    )}')">Tóm tắt nội dung chính</button><button onclick="askPreset('Liệt kê các yêu cầu và mốc thời gian quan trọng nhất trong tài liệu này')">Các yêu cầu quan trọng</button></div></div>${chatMessages
+      .map(messageHTML)
+      .join(
+        ''
+      )}</div><div class="chatcompose"><form onsubmit="event.preventDefault();sendChat()"><input id="chatInput" aria-label="Hỏi trợ giảng AI" placeholder="Đặt câu hỏi bất kỳ cho Lumi AI..."><button class="btn" aria-label="Gửi câu hỏi" type="submit">${icon(
+      'send'
+    )}</button></form><small>Trợ giảng AI trả lời trực tiếp dựa trên nội dung học liệu của bạn</small></div></div>` +
     `</section></div>` +
     footer()
   );
@@ -646,7 +1063,7 @@ addPrototypeSource = async function () {
     return;
   }
   const kind = $('uploadKind')?.value || 'PDF';
-  const textContent = $('uploadText')?.value?.trim() || '';
+  let textContent = $('uploadText')?.value?.trim() || '';
   const fileInput = $('protoFile');
   const file = fileInput?.files?.[0];
 
@@ -654,13 +1071,21 @@ addPrototypeSource = async function () {
   toast('Đang tải lên và phân tích nội dung tài liệu...');
 
   let pdfBase64 = null;
-  if (file && file.name.toLowerCase().endsWith('.pdf')) {
-    pdfBase64 = await new Promise(resolve => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(file);
-    });
+  if (file) {
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      pdfBase64 = await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+    } else if (!textContent) {
+      try {
+        textContent = await file.text();
+      } catch (e) {
+        console.warn(e);
+      }
+    }
   }
 
   try {
@@ -702,27 +1127,57 @@ addPrototypeSource = async function () {
   }
 };
 
+function appendChatMsgDOM(m) {
+  const chatBox = $('chats');
+  if (!chatBox) return;
+  const temp = document.createElement('div');
+  temp.innerHTML = messageHTML(m);
+  const node = temp.firstElementChild;
+  if (m.loading) node.id = 'lumiLoadingMsg';
+  chatBox.appendChild(node);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function replaceLoadingMsgDOM(m) {
+  const loadingEl = $('lumiLoadingMsg');
+  if (loadingEl) {
+    loadingEl.outerHTML = messageHTML(m);
+  } else {
+    appendChatMsgDOM(m);
+  }
+  const chatBox = $('chats');
+  if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function renderChatContainerOnly() {
+  const chatBox = $('chats');
+  if (!chatBox) return;
+  const r = records[sourceIndex] || records[0];
+  const sourceTitle = cleanVietText(r?.title || 'Tài liệu học tập');
+  const totalPages = Math.max(1, currentPdfDoc?.numPages || r?.pageCount || 9);
+
+  let html = `<div class="msg assistant"><span class="label">${icon(
+    'spark'
+  )} TRỢ GIẢNG LUMI AI</span>Chào <strong>${esc(
+    userProfile.name
+  )}</strong>! Mình đang đồng hành cùng bạn trên tài liệu <strong>${esc(
+    sourceTitle
+  )}</strong> (${totalPages} trang).<br>Bạn có thể hỏi bất kỳ câu hỏi nào hoặc chọn gợi ý dưới đây nhé:<div class="suggestions"><button onclick="askPreset('Tóm tắt các nội dung chính trong tài liệu ${esc(
+    sourceTitle
+  )}')">Tóm tắt nội dung chính</button><button onclick="askPreset('Liệt kê các yêu cầu và mốc thời gian quan trọng nhất trong tài liệu này')">Các yêu cầu quan trọng</button></div></div>`;
+
+  html += chatMessages.map(messageHTML).join('');
+  chatBox.innerHTML = html;
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
 openCitation = function (targetPage, ordinal = 1) {
-  if (targetPage) readerPage = targetPage;
+  const p = targetPage || readerPage || 1;
   readerTab = 'chat';
   readingView = 'document';
 
-  const r = records[sourceIndex] || records[0];
-  const maxPage = Math.max(1, r?.pageCount || 1);
-  if (r) persist('lumi-source-page-' + r.id, readerPage);
-
-  const iframe = document.getElementById('lumiPdfFrame');
-  const isRealUUID = r?.id && /^[0-9a-f-]{36}$/i.test(r.id);
-  const realPdfId = isRealUUID ? r.id : (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null);
-
-  if (iframe && realPdfId) {
-    const baseSrc = `${LUMI_API_BASE}/sources/${realPdfId}/file`;
-    iframe.src = `${baseSrc}#page=${readerPage}&zoom=page-width`;
-    const pageNumEl = document.getElementById('pageNum');
-    if (pageNumEl) pageNumEl.textContent = `Trang ${readerPage} / ${maxPage}`;
-  } else {
-    render();
-  }
+  // Điều hướng trang mượt mà ngay trên bản PDF gốc (PDF.js Canvas) hoặc Văn bản AI
+  jumpToPdfPage(p);
 
   // Hiệu ứng phát sáng trên nút trích dẫn vừa bấm
   document.querySelectorAll('.citation-ref-btn').forEach(btn => {
@@ -732,15 +1187,7 @@ openCitation = function (targetPage, ordinal = 1) {
     }
   });
 
-  // Nếu đang ở chế độ text thì cuộn tới đoạn tương ứng
-  const targetEl = document.getElementById(`doc-page-${targetPage}`);
-  if (targetEl) {
-    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    targetEl.classList.add('doc-page-highlight');
-    setTimeout(() => targetEl.classList.remove('doc-page-highlight'), 3000);
-  }
-
-  toast(`🔍 Đang hiển thị nguồn trích dẫn [${ordinal}] tại Trang ${readerPage} trên tài liệu PDF.`);
+  toast(`🔍 Đang hiển thị nguồn trích dẫn [${ordinal}] tại Trang ${p} trên tài liệu PDF.`);
 };
 
 messageHTML = function (m) {
@@ -772,18 +1219,24 @@ sendChat = async function (value) {
   if (!text) return;
   if (inputEl) inputEl.value = '';
 
-  chatMessages.push({ role: 'user', text });
+  const userMsg = { role: 'user', text };
   const loadingMsg = {
     role: 'assistant',
     text: '⏳ Trợ giảng Lumi AI đang phân tích học liệu và tổng hợp câu trả lời cho bạn...',
     loading: true
   };
-  chatMessages.push(loadingMsg);
-  if (page !== 'reader') go('reader');
-  else render();
 
-  const chatBox = $('chats');
-  if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+  chatMessages.push(userMsg);
+  chatMessages.push(loadingMsg);
+
+  if (page !== 'reader') {
+    go('reader');
+  } else {
+    // CẬP NHẬT TRỰC TIẾP VÀO KHUNG CHAT — KHÔNG RENDER LẠI TOÀN BỘ MÀN HÌNH!
+    // Tránh triệt để tình trạng nhấp nháy hoặc tải lại tệp PDF!
+    appendChatMsgDOM(userMsg);
+    appendChatMsgDOM(loadingMsg);
+  }
 
   try {
     const activeRec = records[sourceIndex] || records[0];
@@ -823,7 +1276,6 @@ sendChat = async function (value) {
       })
     });
 
-    // Đọc đúng cấu trúc MessageResponse trả về từ /api/v1/conversations/{id}/messages
     const assistantMsg = msgRes?.data?.assistant_message || msgRes?.data;
     const citations = assistantMsg?.citations || [];
     const firstCite = citations[0];
@@ -838,30 +1290,191 @@ sendChat = async function (value) {
     loadingMsg.citeLabel = citeLabel;
     loadingMsg.citations = citations;
 
-    if (!activeSession) {
-      activeSession = lumiActiveBackendConvId || uid();
-      sessions.unshift({
-        id: activeSession,
-        title: text.slice(0, 55),
-        messages: [],
-        sources: [sourceId]
-      });
-    }
-    const s = sessions.find(x => x.id === activeSession);
-    if (s) {
-      s.messages = chatMessages.map(m => ({ ...m }));
-      persist('lumi-chats', sessions);
-    }
-    render();
-    const updatedChatBox = $('chats');
-    if (updatedChatBox) updatedChatBox.scrollTop = updatedChatBox.scrollHeight;
+    saveChatHistoryForCurrentSource();
+
+    // Cập nhật câu trả lời của AI vào giao diện mà không làm xao động PDF
+    replaceLoadingMsgDOM(loadingMsg);
   } catch (err) {
     loadingMsg.text = `Không thể kết nối máy chủ AI: ${err.message}. Vui lòng thử lại.`;
     loadingMsg.loading = false;
-    lumiActiveBackendConvId = '';
-    render();
+    replaceLoadingMsgDOM(loadingMsg);
   }
 };
+
+// ============================================================================
+// NÂNG CẤP TOÀN DIỆN MÀN HÌNH "GÓC HỌC TẬP" (ẢNH SỐ 5)
+// ============================================================================
+library = function () {
+  const all = [...courses, ...extraCourses];
+  const allSources = records.filter(r => !r.deleted);
+  const filtered = all
+    .map((c, i) => ({ c, i }))
+    .filter(x => !searchTerm || x.c.title.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  // 1. Thống kê nhanh chỉ số học tập
+  const statsHTML = `
+    <div class="l-library-stats">
+      <div class="l-lib-stat-badge">
+        <span class="stat-icon">🎓</span>
+        <span>Khóa học: <strong>${all.length} lộ trình</strong></span>
+      </div>
+      <div class="l-lib-stat-badge">
+        <span class="stat-icon">📑</span>
+        <span>Học liệu đã lập chỉ mục AI: <strong>${allSources.length} tài liệu</strong></span>
+      </div>
+      <div class="l-lib-stat-badge">
+        <span class="stat-icon">📝</span>
+        <span>Sổ tay ghi chú: <strong>${notebooks.length} mục</strong></span>
+      </div>
+      <div class="l-lib-stat-badge">
+        <span class="stat-icon">🗂️</span>
+        <span>Thẻ nhớ SM-2: <strong>${cardDeck.length} thẻ</strong></span>
+      </div>
+    </div>
+  `;
+
+  // 2. Thanh hành động nhanh với bộ icon màu sắc nét (tương đồng thanh đọc)
+  const actionPillsHTML = `
+    <div class="reader-extra-modern" style="margin-bottom:18px">
+      <button class="lumi-tool-pill" onclick="openUpload()" title="Tải thêm tài liệu PDF hoặc giáo trình">
+        <span class="tool-icon-badge upload-badge">${icon('plus')}</span>
+        <span>Thêm học liệu mới</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="openNewCourse()" title="Khởi tạo môn học hoặc lộ trình cá nhân">
+        <span class="tool-icon-badge folder-badge">${icon('folder')}</span>
+        <span>Tạo khóa học</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="go('notes')" title="Mở toàn bộ sổ tay ghi chép">
+        <span class="tool-icon-badge note-badge">${icon('note')}</span>
+        <span>Ghi chú bài học</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="go('history')" title="Xem lại các phiên thảo luận cùng trợ giảng AI">
+        <span class="tool-icon-badge history-badge">${icon('clock')}</span>
+        <span>Lịch sử hỏi đáp AI</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="quizSetup()" title="Biên soạn đề thi trắc nghiệm AI">
+        <span class="tool-icon-badge check-badge">${icon('quiz')}</span>
+        <span>Luyện trắc nghiệm AI</span>
+      </button>
+    </div>
+  `;
+
+  let content = '';
+  if (tab === 'courses') {
+    content = `
+      <div class="librarygrid">
+        ${filtered.map(x => renderModernCourseCard(x.c, x.i)).join('')}
+      </div>
+    `;
+  } else if (tab === 'sources') {
+    content = sourceRows();
+  } else if (tab === 'notes') {
+    content = notebooks.length
+      ? `<div class="feature-grid">${notebooks
+          .map(
+            n => `
+          <article class="settingcard" style="border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.02)">
+            <span class="badge green">${cleanVietText(n.kind || 'Ghi chú')} · Trang ${n.page || 1}</span>
+            <h2 style="font-size:15.5px;margin-top:12px">${esc(n.title)}</h2>
+            <p class="note-text" style="color:var(--secondary);line-height:1.75;font-size:13px">${esc(
+              n.body
+            )}</p>
+            <div class="actionline" style="margin-top:14px">
+              <button class="btn secondary" style="font-size:11.5px;padding:5px 11px" onclick="editNotebook('${
+                n.id
+              }')">Sửa</button>
+              <button class="btn secondary" style="font-size:11.5px;padding:5px 11px" onclick="deleteNotebook('${
+                n.id
+              }')">Xóa</button>
+            </div>
+          </article>
+        `
+          )
+          .join('')}</div>`
+      : empty('Bạn chưa có ghi chú nào.', btn('Tạo ghi chú mới', 'editNotebook()', false, 'plus'));
+  } else {
+    content = `
+      <div class="settingcard" style="border-radius:14px;padding:26px;max-width:680px">
+        <span class="badge green">Bộ câu hỏi trắc nghiệm khách quan AI · FBU</span>
+        <h2 style="font-size:18px;margin:12px 0 8px">Luyện tập kiến thức từ học liệu</h2>
+        <p style="color:var(--secondary);line-height:1.8;margin-bottom:18px">
+          Hệ thống tự động biên soạn các câu hỏi trắc nghiệm 4 lựa chọn bám sát từng trang tài liệu thực tế của bạn, hỗ trợ chấm điểm và phân tích giải thích đáp án đúng/sai ngay lập tức.
+        </p>
+        <button class="btn" onclick="quizSetup()">${icon('quiz')} Bắt đầu làm bài luyện ngay</button>
+      </div>
+    `;
+  }
+
+  return (
+    `<div class="pagehead"><div><div class="eyebrow" style="margin-bottom:9px">GOM NHỮNG ĐIỀU BẠN MUỐN HIỂU</div><h1 style="font-size:26px">Góc học tập</h1><p>Học liệu, ý tưởng và hành trình của riêng bạn.</p></div><button class="btn" onclick="openUpload()">${icon(
+      'plus'
+    )} Thêm học liệu</button></div>` +
+    statsHTML +
+    `<div class="searchbox" style="display:flex;width:100%;max-width:480px;margin-bottom:18px"><span>${icon(
+      'search'
+    )}</span><input aria-label="Tìm trong góc học tập" placeholder="Tìm khóa học hoặc học liệu..." value="${esc(
+      searchTerm
+    )}" oninput="searchTerm=this.value;renderLibraryResults()"></div>` +
+    actionPillsHTML +
+    `<div class="tabs">${[
+      ['courses', `Khóa học (${all.length})`],
+      ['sources', `Học liệu (${allSources.length})`],
+      ['notes', `Ghi chú (${notebooks.length})`],
+      ['practice', `Luyện tập (${cardDeck.length} thẻ)`]
+    ]
+      .map(
+        ([k, v]) =>
+          `<button class="${tab === k ? 'active' : ''}" onclick="tab='${k}';render()">${v}</button>`
+      )
+      .join('')}</div>` +
+    `<div id="libraryResults">${content}</div>` +
+    footer()
+  );
+};
+
+function renderModernCourseCard(c, i) {
+  const isBlue = Boolean(c.blue);
+  const lessons = drafts[i] || [
+    'Tổng quan môn học',
+    'Các khái niệm nền tảng',
+    'Khóa và ràng buộc',
+    'Ứng dụng và luyện tập'
+  ];
+  const curLesson =
+    lessons[Math.min(lessons.length - 1, Math.floor(((c.progress || 0) / 100) * lessons.length))] ||
+    lessons[0];
+  const coverText = c.cover || c.title || 'Khóa học';
+  return `
+    <div class="course" onclick="openCourse(${i})" style="cursor:pointer;display:flex;flex-direction:column">
+      <div class="coursecover ${isBlue ? 'blue' : ''}">
+        <div>
+          <div class="coverlabel">LUMI / LEARNING</div>
+          <div class="covername">${esc(coverText).replace(/\n/g, '<br>')}</div>
+        </div>
+        ${courseArt(isBlue)}
+      </div>
+      <div class="coursebody" style="display:flex;flex-direction:column;flex:1">
+        <span class="badge ${isBlue ? 'green' : ''}" style="align-self:flex-start">${esc(
+          c.tag || 'CNTT · Nền tảng'
+        )}</span>
+        <h3>${c.archived ? '[Lưu trữ] ' : ''}${esc(c.title)}</h3>
+        <p>${esc(c.subtitle || curLesson)}</p>
+        <div class="progressline"><span style="width:${c.progress || 0}%"></span></div>
+        <div class="coursestatus">
+          <span>Đã mở ${esc(c.lessons || '3 / 8 bài')}</span>
+          <span>${c.progress || 0}%</span>
+        </div>
+        <div class="course-card-actions" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+          <button class="btn" style="font-size:11.5px;padding:7px 14px;border-radius:8px" onclick="event.stopPropagation();openCourse(${i})">Vào học ngay ${icon(
+            'arrow'
+          )}</button>
+          <button class="btn secondary" style="font-size:11.5px;padding:7px 11px;border-radius:8px" onclick="event.stopPropagation();selectedCourse=${i};editCurriculum()">Đề cương</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+courseCard = renderModernCourseCard;
 
 // 6. NÂNG CẤP QUIZ, KHÓA HỌC, FLASHCARD SM-2 & QUOTA THẬT
 quizSetup = function () {
@@ -1131,26 +1744,647 @@ rateCard = async function (rating) {
   toast('Đã ghi nhận mức độ nhớ của thẻ.');
 };
 
-const baseStoreNotebook = storeNotebook;
 storeNotebook = async function (id) {
   const title = $('nbTitle')?.value?.trim();
   const body = $('nbBody')?.value?.trim();
-  baseStoreNotebook(id);
-  if (title && body && lumiBackendConnected) {
+  const kind = $('nbKind')?.value || 'note';
+  if (!title || !body) {
+    toast('Bạn nhập cả tiêu đề và nội dung ghi chú nhé.');
+    return;
+  }
+  let existing = notebooks.find(x => x.id === id);
+  if (existing) {
+    Object.assign(existing, { title, body, kind });
+    if (existing.backendId && /^[0-9a-f-]{36}$/i.test(existing.backendId)) {
+      try {
+        await lumiFetch(`/notes/${existing.backendId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ title, body })
+        });
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+  } else {
+    let createdId = null;
     try {
-      await lumiFetch('/notes', {
+      const res = await lumiFetch('/notes', {
         method: 'POST',
         body: JSON.stringify({
           kind: 'note',
           title,
           body,
-          source_id: lumiActiveBackendSourceId || undefined
+          source_id: records[sourceIndex]?.backendId || lumiActiveBackendSourceId || undefined
         })
       });
+      createdId = res?.data?.id || null;
+    } catch (e) {
+      console.warn(e);
+    }
+    notebooks.unshift({
+      id: createdId || uid(),
+      backendId: createdId,
+      title,
+      body,
+      kind,
+      page: readerPage || 1
+    });
+  }
+  saveAllNotes();
+  closeModal();
+  render();
+  toast('Đã lưu ghi chú và đồng bộ thành công!');
+};
+
+deleteNotebook = function (id) {
+  showModal(
+    `<h2 id="modalTitle">Xóa ghi chú?</h2><p>Ghi chú này sẽ được xóa khỏi sổ tay học tập của bạn.</p><div class="modalactions">${btn(
+      'Hủy',
+      'closeModal()',
+      true
+    )}${btn('Xóa ghi chú', `confirmDeleteNotebook('${id}')`)}</div>`
+  );
+};
+
+async function confirmDeleteNotebook(id) {
+  const target = notebooks.find(n => n.id === id);
+  notebooks = notebooks.filter(n => n.id !== id);
+  saveAllNotes();
+  closeModal();
+  render();
+  if (target?.backendId && /^[0-9a-f-]{36}$/i.test(target.backendId)) {
+    try {
+      await lumiFetch(`/notes/${target.backendId}`, { method: 'DELETE' });
     } catch (e) {
       console.warn(e);
     }
   }
+  toast('Đã xóa ghi chú.');
+}
+
+saveNote = async function () {
+  const val = $('noteEditor')?.value || '';
+  note = val;
+  persist('sf-note', note);
+  let n = notebooks.find(x => x.id === 'note0' || x.title === 'Ghi chú trong bài');
+  if (n) {
+    n.body = note;
+    n.page = readerPage || 1;
+    if (n.backendId && /^[0-9a-f-]{36}$/i.test(n.backendId)) {
+      try {
+        await lumiFetch(`/notes/${n.backendId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ title: n.title, body: note })
+        });
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+  } else if (note.trim()) {
+    let createdId = null;
+    try {
+      const res = await lumiFetch('/notes', {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'note',
+          title: 'Ghi chú: ' + (records[sourceIndex]?.title || 'Bài học'),
+          body: note,
+          source_id: records[sourceIndex]?.backendId || lumiActiveBackendSourceId || undefined
+        })
+      });
+      createdId = res?.data?.id || null;
+    } catch (e) {
+      console.warn(e);
+    }
+    notebooks.unshift({
+      id: createdId || 'note0',
+      backendId: createdId,
+      title: 'Ghi chú: ' + (records[sourceIndex]?.title || 'Bài học'),
+      body: note,
+      kind: 'note',
+      page: readerPage || 1
+    });
+  }
+  saveAllNotes();
+  toast('Đã lưu ghi chú và đồng bộ đám mây!');
+};
+
+saveAnswer = async function () {
+  const m = chatMessages.filter(x => x.role === 'assistant' && !x.loading).at(-1);
+  if (!m) return;
+  const cleanBody = m.text;
+  let createdId = null;
+  try {
+    const res = await lumiFetch('/notes', {
+      method: 'POST',
+      body: JSON.stringify({
+        kind: 'note',
+        title: 'Phản hồi từ Trợ giảng Lumi',
+        body: cleanBody,
+        source_id: records[sourceIndex]?.backendId || lumiActiveBackendSourceId || undefined
+      })
+    });
+    createdId = res?.data?.id || null;
+  } catch (e) {
+    console.warn(e);
+  }
+  notebooks.unshift({
+    id: createdId || uid(),
+    backendId: createdId,
+    title: 'Phản hồi từ Trợ giảng Lumi',
+    body: cleanBody,
+    kind: 'saved_answer',
+    page: readerPage || 1
+  });
+  saveAllNotes();
+  note = (note ? note + '\n\n' : '') + cleanBody;
+  persist('sf-note', note);
+  if ($('noteEditor')) $('noteEditor').value = note;
+  toast('Đã lưu câu trả lời vào Sổ tay ghi chú!');
+};
+
+deleteCard = function (id) {
+  showModal(
+    `<h2 id="modalTitle">Xóa thẻ ghi nhớ?</h2><p>Thẻ này sẽ được xóa khỏi bộ thẻ ôn tập SM-2 của bạn.</p><div class="modalactions">${btn(
+      'Hủy',
+      'closeModal()',
+      true
+    )}${btn('Xóa thẻ', `confirmDeleteCard('${id}')`)}</div>`
+  );
+};
+
+async function confirmDeleteCard(id) {
+  const target = cardDeck.find(c => c.id === id);
+  cardDeck = cardDeck.filter(c => c.id !== id);
+  persist('lumi-cards', cardDeck);
+  flashIndex = 0;
+  flipped = false;
+  closeModal();
+  render();
+  if (target?.backendId && /^[0-9a-f-]{36}$/i.test(target.backendId)) {
+    try {
+      await lumiFetch(`/flashcards/cards/${target.backendId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+  toast('Đã xóa thẻ ghi nhớ.');
+}
+
+deleteSource = function () {
+  const r = records[sourceIndex];
+  if (!r) return;
+  showModal(
+    `<h2 id="modalTitle">Xóa học liệu?</h2><p>Tài liệu <strong>${esc(
+      r.title
+    )}</strong> sẽ được chuyển vào thùng rác và ngừng sử dụng trong phiên hỏi đáp.</p><div class="modalactions">${btn(
+      'Hủy',
+      'closeModal()',
+      true
+    )}${btn('Xóa học liệu', 'confirmDeleteSource()')}</div>`
+  );
+};
+
+async function confirmDeleteSource() {
+  const r = records[sourceIndex];
+  if (!r) return;
+  r.deleted = true;
+  saveRecords();
+  closeModal();
+  const bId = r.backendId || r.id;
+  if (bId && /^[0-9a-f-]{36}$/i.test(bId)) {
+    try {
+      await lumiFetch(`/sources/${bId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+  sourceIndex = Math.max(0, records.findIndex(x => !x.deleted));
+  tab = 'sources';
+  go('library');
+  toast('Đã xóa học liệu khỏi thư viện.');
+}
+
+openNewCourse = function () {
+  modalForm(
+    'Tạo khóa học & Lộ trình mới',
+    input('Tên khóa học', 'courseName', '', 'text', 'Ví dụ: Trí tuệ nhân tạo đại cương') +
+      input('Mục tiêu / Chuyên đề trọng tâm', 'courseGoal', '', 'text', 'Ví dụ: Bài 1 · Các thuật toán tìm kiếm'),
+    'submitNewCourseBackend()',
+    'Tạo khóa học'
+  );
+};
+
+async function submitNewCourseBackend() {
+  const name = $('courseName')?.value?.trim();
+  const goal = $('courseGoal')?.value?.trim() || 'Bài 1 · Tổng quan môn học';
+  if (!name) {
+    toast('Bạn nhập tên khóa học nhé.');
+    return;
+  }
+  let createdId = null;
+  try {
+    const srcIds = records
+      .filter(r => !r.deleted && /^[0-9a-f-]{36}$/i.test(r.id))
+      .slice(0, 2)
+      .map(r => r.id);
+    const res = await lumiFetch('/courses', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: name,
+        description: goal,
+        goal,
+        source_ids: srcIds.length ? srcIds : undefined
+      })
+    });
+    createdId = res?.data?.id || null;
+  } catch (e) {
+    console.warn(e);
+  }
+  extraCourses.push({
+    backendId: createdId,
+    title: name,
+    cover: name,
+    tag: 'Khóa học cá nhân',
+    subtitle: goal,
+    progress: 12,
+    lessons: '1 / 6 bài',
+    blue: extraCourses.length % 2 === 1
+  });
+  persist('sf-courses', extraCourses);
+  closeModal();
+  tab = 'courses';
+  go('library');
+  toast(`Đã khởi tạo khóa học "${name}"!`);
+}
+
+privacyDialog = function () {
+  showModal(
+    `<h2 id="modalTitle">Bảo mật & Quản lý dữ liệu</h2><p>Dữ liệu học liệu, lịch sử hỏi đáp Trợ giảng AI và tiến độ ôn tập SM-2 của bạn được đồng bộ an toàn trên cơ sở dữ liệu PostgreSQL và lưu bộ nhớ đệm tại trình duyệt.</p><div class="modalactions">${btn(
+      'Xuất dữ liệu (.JSON)',
+      'exportPrototypeData()',
+      true
+    )}${btn('Đóng', 'closeModal()')}</div>`
+  );
+};
+
+// ============================================================================
+// 7. TRANG MỤC TIÊU & KẾ HOẠCH HỌC TẬP CHUYÊN NGHIỆP (PLANNER PRO)
+// ============================================================================
+let planStatusFilter = 'all';
+
+function getPlanCategoryInfo(p) {
+  const cat = p.category || '';
+  const t = (p.title || '').toLowerCase();
+  if (cat === 'flashcard' || t.includes('thẻ') || t.includes('flashcard')) {
+    return { key: 'flashcard', label: '🗂️ Ôn Flashcard SM-2', cls: 'purple', actionLabel: 'Ôn thẻ ngay', actionFn: "go('flashcards')" };
+  }
+  if (cat === 'quiz' || t.includes('câu hỏi') || t.includes('quiz') || t.includes('trắc nghiệm') || t.includes('bài luyện')) {
+    return { key: 'quiz', label: '📝 Luyện đề Quiz', cls: 'amber', actionLabel: 'Làm bài ngay', actionFn: 'quizSetup()' };
+  }
+  if (cat === 'note' || t.includes('ghi chú') || t.includes('tóm tắt')) {
+    return { key: 'note', label: '✍️ Sổ tay & Tóm tắt', cls: 'blue', actionLabel: 'Mở ghi chú', actionFn: "go('notes')" };
+  }
+  return { key: 'read', label: '📖 Đọc hiểu tài liệu', cls: 'green', actionLabel: 'Đọc tài liệu', actionFn: 'continueLumi()' };
+}
+
+function getPlanPriorityInfo(p) {
+  const prio = p.priority || (p.minutes >= 25 ? 'high' : p.minutes >= 15 ? 'medium' : 'normal');
+  if (prio === 'high') return { label: '🔥 Ưu tiên cao', cls: 'high' };
+  if (prio === 'medium') return { label: '⭐ Trọng tâm', cls: 'medium' };
+  return { label: '🌱 Nhẹ nhàng', cls: 'normal' };
+}
+
+editPlan = function (id) {
+  const p = plans.find(x => x.id === id) || {
+    title: '',
+    day: planDayFilter !== 'all' ? planDayFilter : 'Thứ sáu',
+    minutes: 25,
+    category: 'read',
+    priority: 'medium'
+  };
+  modalForm(
+    id ? 'Chỉnh sửa mục tiêu học tập' : 'Thêm mục tiêu học tập mới',
+    input('Tên nhiệm vụ / mục tiêu cụ thể', 'planTitle', p.title) +
+      select(
+        'Phân loại hoạt động',
+        'planCategory',
+        [
+          '📖 Đọc hiểu tài liệu PDF',
+          '🗂️ Ôn tập thẻ nhớ Flashcard SM-2',
+          '📝 Luyện đề trắc nghiệm AI',
+          '✍️ Viết ghi chú & Tóm tắt ý chính'
+        ],
+        p.category === 'flashcard'
+          ? '🗂️ Ôn tập thẻ nhớ Flashcard SM-2'
+          : p.category === 'quiz'
+          ? '📝 Luyện đề trắc nghiệm AI'
+          : p.category === 'note'
+          ? '✍️ Viết ghi chú & Tóm tắt ý chính'
+          : '📖 Đọc hiểu tài liệu PDF'
+      ) +
+      select(
+        'Mức độ ưu tiên',
+        'planPriority',
+        ['⭐ Trọng tâm', '🔥 Ưu tiên cao', '🌱 Nhẹ nhàng'],
+        p.priority === 'high' ? '🔥 Ưu tiên cao' : p.priority === 'normal' ? '🌱 Nhẹ nhàng' : '⭐ Trọng tâm'
+      ) +
+      select(
+        'Ngày thực hiện trong tuần',
+        'planDay',
+        ['Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy', 'Chủ nhật'],
+        p.day
+      ) +
+      input('Thời lượng dự kiến (phút)', 'planMinutes', p.minutes, 'number'),
+    `storePlan('${id || ''}')`,
+    id ? 'Lưu thay đổi' : 'Thêm vào lộ trình'
+  );
+};
+
+storePlan = function (id) {
+  const title = $('planTitle')?.value?.trim();
+  const minutes = Number($('planMinutes')?.value || 25);
+  if (!title || minutes < 1 || minutes > 480) {
+    toast('Bạn nhập tên mục tiêu và thời lượng hợp lệ (1–480 phút) nhé.');
+    return;
+  }
+  const rawCat = $('planCategory')?.value || '';
+  const category = rawCat.includes('Flashcard')
+    ? 'flashcard'
+    : rawCat.includes('Quiz') || rawCat.includes('trắc nghiệm')
+    ? 'quiz'
+    : rawCat.includes('ghi chú')
+    ? 'note'
+    : 'read';
+  const rawPrio = $('planPriority')?.value || '';
+  const priority = rawPrio.includes('cao') ? 'high' : rawPrio.includes('Nhẹ') ? 'normal' : 'medium';
+  const day = $('planDay')?.value || 'Thứ sáu';
+
+  let p = plans.find(x => x.id === id);
+  const data = { title, minutes, day, category, priority };
+  if (p) {
+    Object.assign(p, data);
+  } else {
+    plans.unshift({ id: uid(), done: false, ...data });
+  }
+  persist('lumi-plans', plans);
+  closeModal();
+  render();
+  toast(id ? 'Đã cập nhật mục tiêu học tập!' : 'Đã thêm mục tiêu mới vào kế hoạch!');
+};
+
+function aiGenerateStudyPlan() {
+  const activeDoc = records.find(r => !r.deleted) || { title: 'Tài liệu môn học' };
+  const docShort = activeDoc.title.replace(/\.pdf$/i, '');
+  const suggested = [
+    {
+      id: uid(),
+      title: `Đọc sâu & phân tích cấu trúc "${docShort}"`,
+      day: 'Thứ sáu',
+      minutes: 25,
+      done: false,
+      category: 'read',
+      priority: 'high'
+    },
+    {
+      id: uid(),
+      title: `Ôn tập ${Math.max(3, cardDeck.length)} thẻ nhớ SM-2 đến hạn`,
+      day: 'Thứ bảy',
+      minutes: 15,
+      done: false,
+      category: 'flashcard',
+      priority: 'medium'
+    },
+    {
+      id: uid(),
+      title: `Làm bài trắc nghiệm AI kiểm tra mức độ hiểu "${docShort}"`,
+      day: 'Chủ nhật',
+      minutes: 20,
+      done: false,
+      category: 'quiz',
+      priority: 'medium'
+    }
+  ];
+  plans.unshift(...suggested);
+  persist('lumi-plans', plans);
+  render();
+  toast('✨ Trợ giảng Lumi đã thiết lập 3 mục tiêu học tập mới từ học liệu của bạn!');
+}
+
+plannerPage = function () {
+  const total = plans.length;
+  const done = plans.filter(p => p.done).length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const totalMins = plans.reduce((s, p) => s + (Number(p.minutes) || 20), 0);
+  const doneMins = plans.filter(p => p.done).reduce((s, p) => s + (Number(p.minutes) || 20), 0);
+  const goal = saved(
+    'lumi-week-goal',
+    'Hoàn thành đọc hiểu tài liệu & nắm vững các khái niệm cốt lõi trong tuần'
+  );
+  const days = ['Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy', 'Chủ nhật'];
+
+  let visible = plans.filter(p => planDayFilter === 'all' || p.day === planDayFilter);
+  if (planStatusFilter === 'pending') visible = visible.filter(p => !p.done);
+  if (planStatusFilter === 'done') visible = visible.filter(p => p.done);
+
+  const kpiHTML = `
+    <div class="planner-pro-kpis">
+      <div class="planner-kpi-card">
+        <div class="planner-kpi-icon green">🎯</div>
+        <div class="planner-kpi-info">
+          <strong>${done} / ${total} hoàn thành (${pct}%)</strong>
+          <small>Tiến độ mục tiêu trong tuần</small>
+        </div>
+      </div>
+      <div class="planner-kpi-card">
+        <div class="planner-kpi-icon blue">⏱️</div>
+        <div class="planner-kpi-info">
+          <strong>${doneMins} / ${totalMins} phút</strong>
+          <small>Tổng thời lượng tập trung</small>
+        </div>
+      </div>
+      <div class="planner-kpi-card">
+        <div class="planner-kpi-icon amber">🔥</div>
+        <div class="planner-kpi-info">
+          <strong>5 ngày liên tiếp</strong>
+          <small>Chuỗi duy trì nhịp độ học tập</small>
+        </div>
+      </div>
+      <div class="planner-kpi-card">
+        <div class="planner-kpi-icon purple">🧠</div>
+        <div class="planner-kpi-info">
+          <strong>${cardDeck.length} thẻ SM-2 · ${notebooks.length} ghi chú</strong>
+          <small>Tích lũy kiến thức cá nhân</small>
+        </div>
+      </div>
+    </div>
+  `;
+
+  return (
+    polishHeader(
+      'Mục tiêu & Kế hoạch học tập',
+      'Thiết lập lộ trình rõ ràng, chia nhỏ nhiệm vụ theo ngày và theo dõi tiến độ thực chất.',
+      `<div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn secondary" onclick="aiGenerateStudyPlan()">${icon('spark')} AI Gợi ý mục tiêu</button>
+        <button class="btn" onclick="editPlan()">${icon('plus')} Thêm mục tiêu mới</button>
+      </div>`,
+      'QUẢN LÝ MỤC TIÊU CÁ NHÂN'
+    ) +
+    kpiHTML +
+    `<div class="p-planner-layout">
+      <section class="p-planner-main">
+        <div class="p-week-strip">
+          <button class="p-week-day ${planDayFilter === 'all' ? 'active' : ''}" onclick="planDayFilter='all';render()">
+            <small>TẤT CẢ</small>
+            <strong>Cả tuần</strong>
+            <span>${total} mục</span>
+          </button>
+          ${days
+            .map((day, i) => {
+              const dayTasks = plans.filter(p => p.day === day);
+              const dayMins = dayTasks.reduce((s, x) => s + (Number(x.minutes) || 15), 0);
+              return `<button class="p-week-day ${
+                planDayFilter === day ? 'active' : ''
+              }" onclick="planDayFilter='${day}';render()">
+                <small>${i === 6 ? 'CN' : 'THỨ ' + (i + 2)}</small>
+                <strong>${['Hai', 'Ba', 'Tư', 'Năm', 'Sáu', 'Bảy', 'CN'][i]}</strong>
+                <span class="${dayTasks.length ? 'has-plan' : ''}">${
+                dayTasks.length ? `${dayTasks.length} việc · ${dayMins}p` : 'Trống'
+              }</span>
+              </button>`;
+            })
+            .join('')}
+        </div>
+
+        <div class="p-group-heading" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin:18px 0 14px">
+          <div>
+            <h2 style="font-size:17px">${
+              planDayFilter === 'all' ? 'Danh sách mục tiêu học tập trong tuần' : 'Lộ trình ngày ' + planDayFilter
+            }</h2>
+            <p>Tích chọn khi hoàn thành hoặc bấm "Thực hiện" để chuyển thẳng tới học liệu tương ứng.</p>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            ${[
+              ['all', `Tất cả (${plans.length})`],
+              ['pending', `Đang làm (${plans.filter(p => !p.done).length})`],
+              ['done', `Đã xong (${done})`]
+            ]
+              .map(
+                ([k, label]) =>
+                  `<button class="btn ${
+                    planStatusFilter === k ? '' : 'secondary'
+                  }" style="font-size:11px;padding:6px 11px;border-radius:8px;margin:0" onclick="planStatusFilter='${k}';render()">${label}</button>`
+              )
+              .join('')}
+          </div>
+        </div>
+
+        <div class="p-task-list" style="display:flex;flex-direction:column;gap:12px">
+          ${visible
+            .map(p => {
+              const cat = getPlanCategoryInfo(p);
+              const prio = getPlanPriorityInfo(p);
+              return `
+                <article class="planner-task-pro ${p.done ? 'completed' : ''}">
+                  <div class="planner-task-left">
+                    <button class="task-check ${p.done ? 'done' : ''}" style="margin-top:3px;width:22px;height:22px" aria-label="Đổi trạng thái ${esc(
+                p.title
+              )}" onclick="togglePlan('${p.id}')">${p.done ? icon('check') : ''}</button>
+                    <div class="planner-task-info">
+                      <div class="planner-task-badges">
+                        <span class="goal-cat-tag ${cat.cls}">${cat.label}</span>
+                        <span class="priority-pill ${prio.cls}">${prio.label}</span>
+                        <span class="badge ${p.done ? 'green' : ''}">${
+                p.done ? '✓ Đã hoàn thành' : 'Đang thực hiện'
+              }</span>
+                      </div>
+                      <h3>${esc(p.title)}</h3>
+                      <div class="planner-task-meta">
+                        <span>📅 ${esc(p.day)}</span>
+                        <span>⏱️ Thời lượng: <strong>${p.minutes} phút</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="planner-task-actions">
+                    ${
+                      !p.done
+                        ? `<button class="btn" style="font-size:11.5px;padding:7px 12px;border-radius:8px;margin:0" onclick="${cat.actionFn}">${cat.actionLabel} ${icon('arrow')}</button>`
+                        : ''
+                    }
+                    <button class="btn secondary" style="font-size:11.5px;padding:7px 10px;border-radius:8px;margin:0" aria-label="Sửa ${esc(
+                      p.title
+                    )}" onclick="editPlan('${p.id}')">Sửa</button>
+                    <button class="btn secondary" style="font-size:11.5px;padding:7px 10px;border-radius:8px;margin:0;color:#be123c" aria-label="Xóa ${esc(
+                      p.title
+                    )}" onclick="deletePlan('${p.id}')">Xóa</button>
+                  </div>
+                </article>
+              `;
+            })
+            .join('') ||
+            polishedEmpty(
+              'sprout',
+              'Chưa có mục tiêu nào trong mục lọc này.',
+              'Hãy thêm một mục tiêu học tập mới hoặc nhờ AI gợi ý lộ trình.',
+              btn('Thêm mục tiêu mới', 'editPlan()', false, 'plus')
+            )}
+        </div>
+      </section>
+
+      <aside class="p-planner-side">
+        <section class="p-goal-card" style="border-radius:16px;padding:22px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span class="p-mini-label" style="margin:0">MỤC TIÊU TRỌNG TÂM TUẦN (OKR)</span>
+            <span class="badge green">${pct}% hoàn thành</span>
+          </div>
+          <h2 style="font-size:16px;line-height:1.5;margin:10px 0 14px">${esc(goal)}</h2>
+          <div class="p-goal-progress" style="margin-bottom:8px">
+            <span>Đã hoàn thành ${done} / ${total} nhiệm vụ (${doneMins} phút)</span>
+            <strong>${pct}%</strong>
+          </div>
+          <div class="progressline" style="height:8px;border-radius:99px;margin-bottom:16px">
+            <span style="width:${pct}%;border-radius:99px"></span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${btn('Sửa mục tiêu tuần', 'editGoal()', true)}
+            <button class="btn secondary" style="font-size:11.5px" onclick="go('focus')">⏱️ Đồng hồ Pomodoro</button>
+          </div>
+        </section>
+
+        <section class="p-reminder-card" style="border-radius:16px;padding:22px">
+          <div class="sectiontitle">
+            <h2>Lịch nhắc học tập định kỳ</h2>
+            ${icon('clock')}
+          </div>
+          <p style="font-size:12px;color:var(--secondary);line-height:1.6;margin-bottom:14px">
+            Thiết lập khung giờ cố định giúp duy trì thói quen đọc hiểu và ôn tập thẻ nhớ SM-2 mỗi ngày.
+          </p>
+          ${reminders
+            .map(
+              r => `
+            <div class="reminder-row" style="padding:10px 0;border-bottom:1px solid var(--border)">
+              <span>
+                <strong style="font-size:12.5px;display:block">${esc(r.title)}</strong>
+                <small style="color:var(--muted)">⏰ ${esc(r.time)} · 📅 ${esc(r.days)}</small>
+              </span>
+              <button class="toggle ${r.enabled ? 'on' : ''}" role="switch" aria-checked="${
+                r.enabled
+              }" aria-label="Bật nhắc ${esc(r.title)}" onclick="toggleReminder('${r.id}')"><span></span></button>
+              <button class="p-edit" aria-label="Xóa lịch nhắc" onclick="reminders=reminders.filter(x=>x.id!=='${
+                r.id
+              }');persist('lumi-reminders',reminders);render()">×</button>
+            </div>`
+            )
+            .join('') ||
+            '<div class="p-reminder-empty">Chưa có khung giờ nhắc học.</div>'}
+          <div style="margin-top:14px">
+            ${btn('Thêm khung giờ nhắc học', 'editReminder()', true, 'plus')}
+          </div>
+        </section>
+      </aside>
+    </div>` +
+    footer()
+  );
 };
 
 quotaDialog = async function () {

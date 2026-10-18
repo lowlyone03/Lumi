@@ -222,6 +222,7 @@ async def get_note_detail(
 
 
 @router.put("/{note_id}", response_model=APIResponse[NoteResponse])
+@router.patch("/{note_id}", response_model=APIResponse[NoteResponse])
 async def update_note(
     note_id: UUID,
     req: UpdateNoteRequest,

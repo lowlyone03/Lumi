@@ -236,6 +236,30 @@ async def list_my_sources(
         res = await session.execute(query)
         sources = res.scalars().all()
 
+        active_ver_ids = [s.active_version_id for s in sources if s.active_version_id]
+        ver_map = {}
+        if active_ver_ids:
+            v_res = await session.execute(
+                select(SourceVersion).where(
+                    SourceVersion.id.in_(active_ver_ids),
+                    SourceVersion.owner_id == current_user.id
+                )
+            )
+            for v in v_res.scalars().all():
+                ver_map[v.id] = SourceVersionResponse(
+                    id=v.id,
+                    version_no=v.version_no,
+                    status=v.status,
+                    storage_path=v.storage_path,
+                    mime_type=v.mime_type,
+                    size_bytes=v.size_bytes,
+                    content_hash=v.content_hash,
+                    page_count=v.page_count,
+                    duration_ms=v.duration_ms,
+                    processed_at=v.processed_at,
+                    created_at=v.created_at
+                )
+
         data: List[SourceResponse] = []
         for s in sources:
             data.append(SourceResponse(
@@ -248,6 +272,7 @@ async def list_my_sources(
                 original_url=s.original_url,
                 is_favorite=s.is_favorite,
                 active_version_id=s.active_version_id,
+                active_version=ver_map.get(s.active_version_id),
                 created_at=s.created_at,
                 updated_at=s.updated_at
             ))

@@ -522,6 +522,7 @@ async def get_card(
 
 
 @router.put("/cards/{card_id}", response_model=APIResponse[FlashcardResponse])
+@router.patch("/cards/{card_id}", response_model=APIResponse[FlashcardResponse])
 async def update_card(
     card_id: UUID4,
     req: FlashcardUpdate,
@@ -778,6 +779,70 @@ Yêu cầu định dạng:
 # ============================================================================
 # 4. SM-2 SPACED REPETITION (ÔN TẬP ĐẾN HẠN & ĐÁNH GIÁ NGUYÊN TỬ)
 # ============================================================================
+
+@router.get("/due", response_model=APIResponse[List[FlashcardResponse]])
+async def get_all_due_cards_for_study(
+    limit: int = Query(50, ge=1, le=200, description="Số lượng thẻ tối đa lấy để ôn"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Lấy danh sách các thẻ cần ôn tập hôm nay trên toàn bộ các bộ thẻ của người dùng (Spaced Repetition Due Queue).
+    """
+    now = datetime.utcnow()
+
+    async with scoped_user_session(current_user.id) as session:
+        query = (
+            select(Flashcard, CardSchedule)
+            .outerjoin(CardSchedule, and_(CardSchedule.card_id == Flashcard.id, CardSchedule.owner_id == current_user.id))
+            .where(
+                Flashcard.owner_id == current_user.id,
+                Flashcard.deleted_at.is_(None),
+                Flashcard.status == 'active',
+                or_(CardSchedule.due_at.is_(None), CardSchedule.due_at <= now)
+            )
+            .order_by(CardSchedule.due_at.asc().nullsfirst())
+            .limit(limit)
+        )
+        res = await session.execute(query)
+        rows = res.all()
+
+        results = []
+        for card, sched in rows:
+            sched_resp = None
+            if sched:
+                sched_resp = CardScheduleResponse(
+                    card_id=sched.card_id,
+                    state=sched.state,
+                    due_at=sched.due_at,
+                    interval_days=sched.interval_days,
+                    repetitions=sched.repetitions,
+                    ease_factor=float(sched.ease_factor),
+                    lapses=sched.lapses,
+                    algorithm_version=sched.algorithm_version,
+                    last_reviewed_at=sched.last_reviewed_at
+                )
+
+            results.append(
+                FlashcardResponse(
+                    id=card.id,
+                    deck_id=card.deck_id,
+                    owner_id=card.owner_id,
+                    front=card.front,
+                    back=card.back,
+                    source_id=card.source_id,
+                    source_version_id=card.source_version_id,
+                    chunk_id=card.chunk_id,
+                    locator=card.locator,
+                    origin=card.origin,
+                    status=card.status,
+                    schedule=sched_resp,
+                    created_at=card.created_at,
+                    updated_at=card.updated_at
+                )
+            )
+
+        return APIResponse(success=True, data=results)
+
 
 @router.get("/decks/{deck_id}/due", response_model=APIResponse[List[FlashcardResponse]])
 async def get_due_cards_for_study(

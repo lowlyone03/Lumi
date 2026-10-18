@@ -522,3 +522,903 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
   flex: 1 1 auto !important;
 }
 
+/* ==========================================================================
+ * LUMI 2.1 MODERN READER TOOLBAR PILLS (ẢNH 2)
+ * ========================================================================== */
+.reader-extra-modern {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  margin: 14px 0 18px !important;
+  align-items: center !important;
+}
+
+.lumi-tool-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  padding: 7px 14px 7px 9px !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 9999px !important;
+  font-size: 12.5px !important;
+  font-weight: 550 !important;
+  color: var(--text) !important;
+  cursor: pointer !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 1.5px 5px rgba(0, 0, 0, 0.03) !important;
+  user-select: none !important;
+  text-decoration: none !important;
+}
+
+.lumi-tool-pill:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07) !important;
+  border-color: var(--accent) !important;
+}
+
+.lumi-tool-pill:active {
+  transform: translateY(0) scale(0.98) !important;
+}
+
+.tool-icon-badge {
+  width: 27px !important;
+  height: 27px !important;
+  border-radius: 50% !important;
+  display: grid !important;
+  place-items: center !important;
+  flex-shrink: 0 !important;
+}
+
+.tool-icon-badge svg {
+  width: 14.5px !important;
+  height: 14.5px !important;
+  stroke-width: 2 !important;
+}
+
+/* Palette for Tool Badges */
+.folder-badge { background: #e6f6ee !important; color: #107e4d !important; }
+.history-badge { background: #efe9fb !important; color: #6d28d9 !important; }
+.spark-badge { background: #fef3c7 !important; color: #b45309 !important; }
+.upload-badge { background: #e0f2fe !important; color: #0284c7 !important; }
+.note-badge { background: #ffedd5 !important; color: #c2410c !important; }
+.check-badge { background: #ecfdf5 !important; color: #059669 !important; }
+
+html[data-theme=dark] .folder-badge { background: #133827 !important; color: #34d399 !important; }
+html[data-theme=dark] .history-badge { background: #2e1d4d !important; color: #a78bfa !important; }
+html[data-theme=dark] .spark-badge { background: #3d2b0e !important; color: #fbbf24 !important; }
+html[data-theme=dark] .upload-badge { background: #11334c !important; color: #38bdf8 !important; }
+html[data-theme=dark] .note-badge { background: #3d2214 !important; color: #fb923c !important; }
+html[data-theme=dark] .check-badge { background: #133a2d !important; color: #34d399 !important; }
+
+/* ==========================================================================
+ * LUMI 2.1 PDF.JS ZERO-FLICKER CANVAS VIEWER
+ * ========================================================================== */
+.pdf-viewer-wrap {
+  width: 100% !important;
+  height: calc(100vh - 220px) !important;
+  min-height: 600px !important;
+  background: #23272d !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid var(--border) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+}
+
+.pdf-scroll-viewport {
+  width: 100% !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+  padding: 24px 18px !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 20px !important;
+  scroll-behavior: smooth !important;
+}
+
+.pdf-page-card {
+  position: relative !important;
+  background: #ffffff !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28) !important;
+  margin: 0 auto 18px !important;
+  max-width: 100% !important;
+  transition: transform 0.25s ease, box-shadow 0.25s ease !important;
+}
+
+.pdf-page-card canvas {
+  display: block !important;
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 6px !important;
+}
+
+.pdf-page-badge {
+  position: absolute !important;
+  top: 10px !important;
+  right: 12px !important;
+  background: rgba(30, 41, 59, 0.75) !important;
+  color: #fff !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  padding: 3px 9px !important;
+  border-radius: 12px !important;
+  backdrop-filter: blur(4px) !important;
+  z-index: 2 !important;
+}
+
+.page-citation-focus {
+  animation: pageCitationHighlight 2.5s ease-out forwards !important;
+}
+
+@keyframes pageCitationHighlight {
+  0% {
+    outline: 5px solid #10b981;
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0.35), 0 8px 30px rgba(0, 0, 0, 0.4);
+    transform: scale(1.015);
+  }
+  70% {
+    outline: 4px solid #10b981;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15), 0 4px 18px rgba(0, 0, 0, 0.28);
+    transform: scale(1);
+  }
+  100% {
+    outline: 2px solid transparent;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+    transform: scale(1);
+  }
+}
+
+/* ==========================================================================
+ * LUMI 2.1 MODERN CHAT HEADER & CONTROLS
+ * ========================================================================== */
+.chat-action-badge-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  margin-left: auto !important;
+}
+
+.chat-mini-action-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 11px !important;
+  font-weight: 550 !important;
+  padding: 4px 9px !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--surface2) !important;
+  color: var(--text) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.chat-mini-action-btn:hover {
+  background: var(--surface3) !important;
+  border-color: var(--accent) !important;
+}
+
+/* ==========================================================================
+ * LUMI 2.1 RECENT LEARNING MATERIALS MODERN CARDS (ẢNH 4)
+ * ========================================================================== */
+.l-recent-modern-grid {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  margin-top: 10px !important;
+}
+
+.l-recent-modern-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  padding: 14px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.02) !important;
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.l-recent-modern-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.05) !important;
+}
+
+.l-recent-card-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  cursor: pointer !important;
+}
+
+.l-recent-doc-icon {
+  width: 44px !important;
+  height: 48px !important;
+  border-radius: 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  flex-shrink: 0 !important;
+  font-weight: 700 !important;
+}
+
+.l-recent-doc-icon.pdf {
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+}
+
+.l-recent-doc-icon.video {
+  background: #eff6ff !important;
+  color: #2563eb !important;
+  border: 1px solid #bfdbfe !important;
+}
+
+.l-recent-doc-icon svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.doc-badge-type {
+  font-size: 8.5px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px !important;
+  position: absolute !important;
+  top: 4px !important;
+  right: 5px !important;
+  opacity: 0.8 !important;
+}
+
+.l-recent-doc-details {
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.l-recent-doc-title-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-bottom: 5px !important;
+}
+
+.l-recent-doc-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--text) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.l-recent-status-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  color: #059669 !important;
+  background: #ecfdf5 !important;
+  border: 1px solid #a7f3d0 !important;
+  padding: 2px 7px !important;
+  border-radius: 10px !important;
+  flex-shrink: 0 !important;
+}
+
+.pulse-dot {
+  width: 6px !important;
+  height: 6px !important;
+  background: #10b981 !important;
+  border-radius: 50% !important;
+  animation: pulseDot 2s infinite !important;
+}
+
+.l-recent-doc-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  font-size: 11.5px !important;
+  color: var(--secondary) !important;
+  flex-wrap: wrap !important;
+}
+
+.meta-separator {
+  color: var(--border) !important;
+}
+
+.l-recent-progress-bar {
+  width: 100% !important;
+  max-width: 220px !important;
+  height: 4px !important;
+  background: var(--surface3) !important;
+  border-radius: 99px !important;
+  margin-top: 6px !important;
+  overflow: hidden !important;
+}
+
+.l-recent-progress-fill {
+  height: 100% !important;
+  background: var(--accent) !important;
+  border-radius: 99px !important;
+  transition: width 0.4s ease !important;
+}
+
+.l-recent-card-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+.l-recent-read-btn {
+  font-size: 12px !important;
+  padding: 7px 14px !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+}
+
+.l-recent-mini-btn {
+  font-size: 11.5px !important;
+  padding: 7px 11px !important;
+  border-radius: 8px !important;
+}
+
+/* ==========================================================================
+ * LUMI 2.1 MODERN "GÓC HỌC TẬP" UPGRADE (ẢNH 5)
+ * ========================================================================== */
+.l-library-stats {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+  margin: 14px 0 20px !important;
+}
+
+.l-lib-stat-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  padding: 8px 14px !important;
+  font-size: 12.5px !important;
+  font-weight: 550 !important;
+  color: var(--text) !important;
+  box-shadow: 0 1.5px 5px rgba(0, 0, 0, 0.02) !important;
+}
+
+.l-lib-stat-badge .stat-icon {
+  font-size: 15px !important;
+}
+
+.l-lib-stat-badge strong {
+  font-weight: 700 !important;
+  color: var(--accent) !important;
+}
+
+.course-modern-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+  gap: 18px !important;
+  margin-top: 14px !important;
+}
+
+.course-modern-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.course-modern-card:hover {
+  transform: translateY(-3px) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.07) !important;
+}
+
+.course-card-top {
+  padding: 20px 20px 16px !important;
+  background: linear-gradient(135deg, rgba(23, 105, 87, 0.08) 0%, rgba(30, 60, 50, 0.02) 100%) !important;
+  border-bottom: 1px solid var(--border) !important;
+  position: relative !important;
+}
+
+.course-card-top.blue {
+  background: linear-gradient(135deg, rgba(32, 98, 184, 0.08) 0%, rgba(20, 50, 90, 0.02) 100%) !important;
+}
+
+.course-card-tag {
+  display: inline-block !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+  color: var(--accent) !important;
+  margin-bottom: 6px !important;
+}
+
+.course-card-top h3 {
+  font-size: 17px !important;
+  font-weight: 650 !important;
+  color: var(--text) !important;
+  margin: 0 !important;
+  line-height: 1.35 !important;
+}
+
+.course-card-body {
+  padding: 16px 20px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+}
+
+.course-card-chapter {
+  font-size: 12.5px !important;
+  color: var(--secondary) !important;
+  margin-bottom: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.course-card-progress-bar {
+  height: 6px !important;
+  background: var(--surface3) !important;
+  border-radius: 99px !important;
+  overflow: hidden !important;
+  margin-bottom: 8px !important;
+}
+
+.course-card-progress-fill {
+  height: 100% !important;
+  background: var(--accent) !important;
+  border-radius: 99px !important;
+  transition: width 0.3s ease !important;
+}
+
+.course-card-status-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  font-size: 11px !important;
+  color: var(--muted) !important;
+  font-weight: 550 !important;
+  margin-bottom: 16px !important;
+}
+
+.course-card-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin-top: auto !important;
+}
+
+/* ============================================================================
+   7. NÂNG CẤP GIAO DIỆN MỤC TIÊU HỌC TẬP (TRANG CHỦ & TRANG KẾ HOẠCH CHI TIẾT)
+   ============================================================================ */
+
+.l-home-goal-pro {
+  padding: 20px !important;
+  border-radius: 18px !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03) !important;
+}
+
+.goal-pro-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  margin-bottom: 14px !important;
+}
+
+.goal-pro-title-wrap {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.goal-pro-icon {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 10px !important;
+  background: rgba(23, 105, 87, 0.1) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 17px !important;
+  flex-shrink: 0 !important;
+}
+
+.goal-pro-title-wrap h2 {
+  font-size: 14.5px !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  margin: 0 !important;
+  line-height: 1.25 !important;
+}
+
+.goal-pro-title-wrap small {
+  font-size: 11px !important;
+  color: var(--muted) !important;
+  display: block !important;
+  margin-top: 2px !important;
+}
+
+.goal-pro-link {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  color: var(--accent) !important;
+  padding: 5px 10px !important;
+  border-radius: 8px !important;
+  background: rgba(23, 105, 87, 0.07) !important;
+  transition: all 0.15s ease !important;
+}
+
+.goal-pro-link:hover {
+  background: var(--accent) !important;
+  color: #fff !important;
+}
+
+.goal-pro-link svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.goal-pro-okr-box {
+  background: linear-gradient(135deg, rgba(23, 105, 87, 0.07) 0%, rgba(36, 116, 88, 0.02) 100%) !important;
+  border: 1px solid rgba(23, 105, 87, 0.16) !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  margin-bottom: 14px !important;
+}
+
+.goal-pro-okr-top {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 5px !important;
+}
+
+.goal-okr-label {
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.7px !important;
+  color: var(--accent) !important;
+}
+
+.goal-okr-pct {
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  color: var(--accent) !important;
+}
+
+.goal-okr-text {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--text) !important;
+  line-height: 1.45 !important;
+  margin: 0 0 9px 0 !important;
+}
+
+.goal-pro-bar {
+  height: 6px !important;
+  background: var(--surface3) !important;
+  border-radius: 99px !important;
+  overflow: hidden !important;
+}
+
+.goal-pro-bar-fill {
+  height: 100% !important;
+  background: linear-gradient(90deg, var(--accent), #2fa37c) !important;
+  border-radius: 99px !important;
+  transition: width 0.35s ease !important;
+}
+
+.goal-pro-task-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  margin-bottom: 14px !important;
+}
+
+.goal-pro-task-item {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  padding: 10px 12px !important;
+  border-radius: 11px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--surface2) !important;
+  transition: all 0.18s ease !important;
+}
+
+.goal-pro-task-item:hover {
+  border-color: var(--accent) !important;
+  background: var(--surface) !important;
+}
+
+.goal-pro-task-item.is-done {
+  opacity: 0.72 !important;
+  background: var(--surface) !important;
+}
+
+.goal-pro-task-item.is-done .goal-pro-task-title {
+  text-decoration: line-through !important;
+  color: var(--muted) !important;
+}
+
+.goal-pro-task-body {
+  flex: 1 !important;
+  min-width: 0 !important;
+  cursor: pointer !important;
+}
+
+.goal-pro-task-top {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
+  margin-bottom: 4px !important;
+}
+
+.goal-cat-tag {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  font-size: 9.5px !important;
+  font-weight: 650 !important;
+  padding: 2px 7px !important;
+  border-radius: 99px !important;
+}
+
+.goal-cat-tag.green {
+  background: rgba(23, 105, 87, 0.12) !important;
+  color: #176957 !important;
+}
+
+.goal-cat-tag.purple {
+  background: rgba(124, 58, 237, 0.12) !important;
+  color: #6d28d9 !important;
+}
+
+.goal-cat-tag.amber {
+  background: rgba(217, 119, 6, 0.12) !important;
+  color: #b45309 !important;
+}
+
+.goal-cat-tag.blue {
+  background: rgba(37, 99, 235, 0.12) !important;
+  color: #1d4ed8 !important;
+}
+
+.goal-pro-time {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  color: var(--muted) !important;
+}
+
+.goal-pro-task-title {
+  display: block !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--text) !important;
+  line-height: 1.4 !important;
+}
+
+.goal-pro-task-meta {
+  display: block !important;
+  font-size: 10px !important;
+  color: var(--faint) !important;
+  margin-top: 2px !important;
+}
+
+.goal-pro-actions {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+  margin-bottom: 14px !important;
+}
+
+.goal-mini-btn {
+  margin-top: 0 !important;
+  padding: 7px 10px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  border-radius: 9px !important;
+  justify-content: center !important;
+}
+
+.goal-pro-week-wrap {
+  padding-top: 12px !important;
+  border-top: 1px solid var(--border) !important;
+}
+
+.goal-pro-week-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 8px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: var(--text) !important;
+}
+
+.streak-pill {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: #c2410c !important;
+  background: rgba(251, 146, 60, 0.15) !important;
+  padding: 2px 8px !important;
+  border-radius: 99px !important;
+}
+
+/* Full Planner Page Pro Styles */
+.planner-pro-kpis {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
+  gap: 14px !important;
+  margin-bottom: 22px !important;
+}
+
+.planner-kpi-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 15px !important;
+  padding: 16px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
+}
+
+.planner-kpi-icon {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 20px !important;
+  flex-shrink: 0 !important;
+}
+
+.planner-kpi-icon.green { background: rgba(23, 105, 87, 0.12) !important; }
+.planner-kpi-icon.blue { background: rgba(37, 99, 235, 0.12) !important; }
+.planner-kpi-icon.amber { background: rgba(217, 119, 6, 0.12) !important; }
+.planner-kpi-icon.purple { background: rgba(124, 58, 237, 0.12) !important; }
+
+.planner-kpi-info strong {
+  display: block !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  line-height: 1.25 !important;
+}
+
+.planner-kpi-info small {
+  display: block !important;
+  font-size: 11.5px !important;
+  color: var(--secondary) !important;
+  margin-top: 3px !important;
+}
+
+.planner-task-pro {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  padding: 16px 18px !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02) !important;
+}
+
+.planner-task-pro:hover {
+  border-color: var(--accent) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+.planner-task-pro.completed {
+  opacity: 0.72 !important;
+  background: var(--surface2) !important;
+}
+
+.planner-task-pro.completed h3 {
+  text-decoration: line-through !important;
+  color: var(--muted) !important;
+}
+
+.planner-task-left {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 13px !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.planner-task-info {
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.planner-task-badges {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  flex-wrap: wrap !important;
+  margin-bottom: 6px !important;
+}
+
+.priority-pill {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  padding: 2px 8px !important;
+  border-radius: 99px !important;
+}
+
+.priority-pill.high {
+  background: rgba(225, 29, 72, 0.1) !important;
+  color: #be123c !important;
+}
+
+.priority-pill.medium {
+  background: rgba(37, 99, 235, 0.1) !important;
+  color: #1d4ed8 !important;
+}
+
+.priority-pill.normal {
+  background: var(--surface2) !important;
+  color: var(--secondary) !important;
+}
+
+.planner-task-info h3 {
+  font-size: 14.5px !important;
+  font-weight: 650 !important;
+  color: var(--text) !important;
+  margin: 0 0 5px 0 !important;
+  line-height: 1.35 !important;
+}
+
+.planner-task-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex-wrap: wrap !important;
+  font-size: 11.5px !important;
+  color: var(--secondary) !important;
+}
+
+.planner-task-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-shrink: 0 !important;
+}
+
+

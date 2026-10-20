@@ -192,5 +192,6 @@ window.addEventListener('hashchange',routeLumiFromURL);
 window.addEventListener('popstate',routeLumiFromURL);
 // Expose clear ways back to the introduction and out of the prototype session.
 const sideFooter=document.querySelector('.sidebottom');if(sideFooter)sideFooter.insertAdjacentHTML('beforeend',`<div class="l-app-footer"><button onclick="go('landing')">${icon('back')}Giới thiệu Lumi</button><button onclick="logoutLumi()">Đăng xuất</button></div>`);
-const previousPersonalLumi=personal;personal=function(){return previousPersonalLumi().replace('<div class="settings-foot">',`<div class="l-account-exit">${btn('Trang giới thiệu',"go('landing')",true,'back')}${btn('Đăng xuất','logoutLumi()',true)}</div><div class="settings-foot">`)};
+const previousPersonalLumi=personal;personal=function(){return previousPersonalLumi().replace('<div class="settings-foot">',`<div class="l-account-exit">${btn('Trang giới thiệu Lumi',"go('landing')",true,'back')}${btn('Màn chào giới thiệu App',"openLumiMobile()",true,'spark')}${btn('Đăng xuất','logoutLumi()',true)}</div><div class="settings-foot">`)};
+const mobileBrand=document.querySelector('.mobilebrand');if(mobileBrand){mobileBrand.style.cursor='pointer';mobileBrand.title='Về trang giới thiệu Lumi';mobileBrand.addEventListener('click',()=>go('landing'));}
 routeLumiFromURL();

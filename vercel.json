@@ -3,10 +3,6 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/api/v1/sources/:sourceId/file",
-      "destination": "https://baenwfcstfywrbanweks.supabase.co/storage/v1/object/public/sources/:sourceId.pdf"
-    },
-    {
       "source": "/",
       "destination": "/frontend/source/home.html"
     },
@@ -101,8 +97,8 @@
   ],
   "redirects": [
     {
-      "source": "/api/v1/sources/:sourceId/file",
-      "destination": "https://baenwfcstfywrbanweks.supabase.co/storage/v1/object/public/sources/:sourceId.pdf",
+      "source": "/api/v1/sources/(.*)/file",
+      "destination": "https://baenwfcstfywrbanweks.supabase.co/storage/v1/object/public/sources/$1.pdf",
       "permanent": false
     }
   ]

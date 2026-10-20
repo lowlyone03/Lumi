@@ -857,7 +857,7 @@ async function renderPdfDocumentViaPdfJs(pdfUrl, initialPage = 1) {
 async function renderSinglePdfPage(pdfDoc, pageNum) {
   try {
     const page = await pdfDoc.getPage(pageNum);
-    const canvas = document.getElementById(pdf-canvas-);
+    const canvas = document.getElementById(`pdf-canvas-${pageNum}`);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
@@ -878,8 +878,8 @@ async function renderSinglePdfPage(pdfDoc, pageNum) {
     canvas.height = Math.floor(scaledViewport.height);
 
     // Kích thước hiển thị CSS
-    canvas.style.width = ${desiredCssWidth}px;
-    canvas.style.height = ${Math.floor(desiredCssWidth * (baseViewport.height / baseViewport.width))}px;
+    canvas.style.width = `${desiredCssWidth}px`;
+    canvas.style.height = `${Math.floor(desiredCssWidth * (baseViewport.height / baseViewport.width))}px`;
     canvas.style.display = 'block';
     canvas.style.margin = '0 auto';
     canvas.style.borderRadius = '4px';
@@ -889,7 +889,7 @@ async function renderSinglePdfPage(pdfDoc, pageNum) {
       viewport: scaledViewport
     }).promise;
   } catch (e) {
-    console.warn(Lỗi vẽ trang PDF :, e);
+    console.warn("Lỗi vẽ trang PDF:", e);
   }
 }
 
@@ -4494,31 +4494,46 @@ updatePreviewStatusBanner();
 
 // Điều hướng chuẩn xác theo hash (#auth, #login, #signup, #mobile, #landing, #home...)
 function handleLumiRouteFromHash() {
-  const hash = (location.hash || '').replace(/^#/, '').split('?')[0];
+  let route = '';
+  const isHttp = typeof location !== 'undefined' && location.protocol && location.protocol.startsWith('http');
+  if (isHttp) {
+    const pathPart = location.pathname.replace(/^\/+|\/+$/g, '').split('/')[0];
+    if (pathPart && pathPart !== 'index.html' && pathPart !== 'START-HERE.html' && pathPart !== 'preview.html') {
+      route = pathPart;
+    }
+  }
+  if (!route) {
+    route = (location.hash || '').replace(/^#\/?/, '').split('?')[0];
+  }
+
   if (typeof lumiSession === 'function' && lumiSession()) {
-    if (hash === 'auth' || hash === 'login' || hash === 'signup' || !hash || hash === 'landing') {
+    if (route === 'auth' || route === 'login' || route === 'signup' || !route || route === 'landing') {
       page = 'home';
-      location.hash = '#home';
+      if (isHttp && location.pathname !== '/home') {
+        try { history.replaceState({ lumiPage: 'home' }, '', '/home' + (location.search || '')); } catch(e) {}
+      } else if (!isHttp) {
+        location.hash = '#home';
+      }
       render();
       return;
     }
   }
-  if (hash === 'auth' || hash === 'login' || hash === 'signup') {
-    authMode = hash === 'signup' ? 'signup' : 'login';
+  if (route === 'auth' || route === 'login' || route === 'signup') {
+    authMode = route === 'signup' ? 'signup' : 'login';
     page = 'auth';
     render();
-  } else if (hash === 'landing') {
+  } else if (route === 'landing') {
     page = 'landing';
     render();
-  } else if (hash === 'mobile') {
+  } else if (route === 'mobile') {
     if (typeof openLumiMobile === 'function') openLumiMobile();
     else { page = 'mobile'; render(); }
-  } else if (hash && Object.hasOwn(names, hash)) {
+  } else if (route && Object.hasOwn(names, route)) {
     if (typeof lumiSession === 'function' && !lumiSession()) {
       page = 'auth';
       authMode = 'login';
     } else {
-      page = hash;
+      page = route;
     }
     render();
   }

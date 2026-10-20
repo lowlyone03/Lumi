@@ -46,14 +46,14 @@ submitAuth=function(){
 const accountOriginalEnter=enterLumi;
 enterLumi=function(mode){if(page==='landing'){setMode('desktop');mobileFlow=false}accountOriginalEnter(mode)};
 const accountOriginalGo=go;
-go=function(p){if(p==='mobile'){setMode('mobile');page='mobile';lumiGuestMenu=false;setLumiEntry('public');if(location.hash!=='#mobile')history.pushState({lumiPage:'mobile'},'','#mobile');render();window.scrollTo({top:0,behavior:'instant'});return}accountOriginalGo(p)};
+go=function(p){if(p==='mobile'){setMode('mobile');page='mobile';lumiGuestMenu=false;setLumiEntry('public');if(typeof location!=='undefined'&&location.protocol&&location.protocol.startsWith('http')){if(location.pathname!=='/mobile')history.pushState({lumiPage:'mobile'},'','/mobile');}else{if(location.hash!=='#mobile')history.pushState({lumiPage:'mobile'},'','#mobile');}render();window.scrollTo({top:0,behavior:'instant'});return}accountOriginalGo(p)};
 const accountOriginalRender=render;
 render=function(){
   if(page==='mobile'){document.documentElement.dataset.surface='mobile-intro';setLumiEntry('public');$('publicRoot').innerHTML=mobileWelcomePage();document.title='Lumi — App mobile';if(typeof playLumiMotion==='function')playLumiMotion(document.querySelector('.onboarding-copy'),[{opacity:.5,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}],{duration:300});return}
   document.documentElement.dataset.surface=page==='landing'?'landing':page==='auth'?'account':'app';
   if(page==='auth'){
     if(typeof lumiSession==='function'&&lumiSession()){
-      page='home';location.hash='#home';
+      page='home';if(typeof location!=='undefined'&&location.protocol&&location.protocol.startsWith('http')){try{history.replaceState({lumiPage:'home'},'','/home');}catch(e){}}else{location.hash='#home';}
       accountOriginalRender();
       return;
     }

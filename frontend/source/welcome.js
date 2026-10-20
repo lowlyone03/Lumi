@@ -57,8 +57,18 @@ go=function(p){
     page=Object.hasOwn(names,p)?p:'home';
     if(page==='reader'&&readerTab==='notes')readingView='assistant'
   }
-  const hash='#'+page;
-  if(location.hash!==hash)history.pushState({lumiPage:page},'',hash);
+  const isHttp = typeof location !== 'undefined' && location.protocol && location.protocol.startsWith('http');
+  if(isHttp){
+    const cleanPath = (page==='landing'||(!lumiSession()&&page==='landing'))?'/':('/'+page);
+    if(location.pathname!==cleanPath){
+      try{history.pushState({lumiPage:page},'',cleanPath+(location.search||''));}catch(e){}
+    }
+  } else {
+    const hash='#'+page;
+    if(location.hash!==hash){
+      try{history.pushState({lumiPage:page},'',hash);}catch(e){}
+    }
+  }
   if($('crumb'))$('crumb').textContent=names[page]||'Lumi';
   render();
   window.scrollTo({top:0,behavior:'instant'})
@@ -91,7 +101,10 @@ submitAuth=function(){
   pendingLumiRoute='home';
   closeModal();
   page=destination;
-  location.hash='#'+destination;
+  if(typeof location!=='undefined'&&location.protocol&&location.protocol.startsWith('http')){
+    const cleanPath = destination==='landing'?'/':('/'+destination);
+    try{history.replaceState({lumiPage:destination},'',cleanPath+(location.search||''));}catch(e){}
+  }else{location.hash='#'+destination;}
   render();
   toast('Chào mừng bạn đến với không gian học tập Lumi AI!');
 };
@@ -122,11 +135,25 @@ home=function(){
   const currentPg=(last?.id===source?.id&&last?.page)?last.page:1;
   return `<div class="l-home-welcome"><div><span class="eyebrow">GÓC HỌC TẬP CỦA BẠN</span><h1>Chào ${esc(firstName)},<br>mình học thêm một chút nhé?</h1><p>Tiếp nối điều đang tò mò. Không cần vội.</p></div><button class="l-home-add" onclick="openUpload()">${icon('plus')}Thêm học liệu</button></div><div class="l-home-grid"><div class="l-home-primary"><section class="l-continue-card"><div><span class="l-continue-label">${last?'TIẾP TỤC TỪ NƠI BẠN DỪNG':'MỘT ĐIỀU ĐỂ BẮT ĐẦU'}</span><h2>${source?esc(source.title.replace(/\.pdf$/i,'')):'Một tài liệu, một điều mới.'}</h2><p>${source?(source.type==='VIDEO'?'Video và transcript tương tác':'Đang ở trang '+currentPg+' · Học liệu sẵn sàng'):'Thêm một tài liệu bạn muốn hiểu. Lumi sẽ cùng bạn khám phá.'}</p><button class="btn" onclick="continueLumi()">${source?'Học tiếp':'Thêm tài liệu'}${icon('arrow')}</button></div><div class="l-continue-art" aria-hidden="true"><div><small>LUMI / LEARNING</small>${icon('book')}<i></i><i></i><span>Mỗi chút hiểu thêm.</span></div></div></section><div class="l-home-quick"><button onclick="readerTab='chat';readingView='assistant';if(typeof openAskSource==='function')openAskSource();else go('reader')">${toneIcon('spark','green')}<span><strong>Hỏi điều chưa rõ</strong><small>Mình cùng tìm hiểu.</small></span>${icon('chevron')}</button><button onclick="editNotebook()">${toneIcon('note','amber')}<span><strong>Ghi lại một ý hay</strong><small>Bằng lời của bạn.</small></span>${icon('chevron')}</button></div><section class="l-home-section"><div class="sectiontitle"><h2>Khóa học của mình</h2><button class="textbtn" onclick="tab='courses';go('library')">Xem tất cả ${icon('chevron')}</button></div>${allCourses.length?`<div class="courses">${allCourses.map(({c,i})=>courseCard(c,i)).join('')}</div>`:polishedEmpty('book','Một chủ đề bạn muốn học.','Gom học liệu và tạo một lộ trình của riêng mình.',btn('Tạo khóa học','openNewCourse()',true))}</section><section class="l-home-section"><div class="sectiontitle"><h2>Học liệu gần đây</h2><button class="textbtn" onclick="tab='sources';go('library')">Mở thư viện ${icon('chevron')}</button></div><div class="l-home-recent">${recent.map(r=>`<button onclick="viewSource(${records.indexOf(r)})"><span class="l-recent-file ${r.type==='VIDEO'?'video':''}">${icon(r.type==='VIDEO'?'play':'file')}</span><span><strong>${esc(r.title)}</strong><small>${esc(r.meta)}</small></span>${icon('chevron')}</button>`).join('')||`<div class="l-empty-library">Thư viện còn trống. Một tài liệu là đủ để bắt đầu.</div>`}</div></section></div><aside class="l-home-aside"><section class="l-home-ai"><div class="l-home-ai-head">${toneIcon('spark','green')}<span><strong>Lumi ở đây.</strong><small>Cùng bạn hiểu thêm.</small></span></div><p>Có điều gì đang làm bạn vướng? Cứ bắt đầu từ một câu hỏi.</p><form onsubmit="event.preventDefault();const q=document.getElementById('homeQuestion').value.trim();if(q)sendChat(q)"><label class="sr-only" for="homeQuestion">Câu hỏi cho Lumi</label><textarea id="homeQuestion" placeholder="Hỏi trợ giảng AI về tài liệu đang học..." rows="3" required></textarea><button class="btn" type="submit">Cùng tìm hiểu ${icon('arrow')}</button></form><span class="l-sample-note">Trợ giảng AI Hybrid RAG · Tự động bám sát tài liệu đang học.</span></section><section class="l-home-plan"><div class="sectiontitle"><h2>Dự định nhỏ</h2><button aria-label="Mở kế hoạch" onclick="go('planner')">${icon('arrow')}</button></div>${scheduled.map(p=>`<div class="l-home-plan-row"><button class="task-check" aria-label="Hoàn thành ${esc(p.title)}" onclick="togglePlan('${p.id}')"></button><span><strong>${esc(p.title)}</strong><small>${esc(p.day)} · ${p.minutes} phút</small></span></div>`).join('')||'<p>Chưa có kế hoạch cũng không sao.<br>Bạn có thể học theo hứng thú hôm nay.</p>'}<button class="textbtn" onclick="go('planner')">Sắp xếp khi cần ${icon('chevron')}</button></section>${notebooks[0]?`<section class="l-home-note"><span class="l-kicker">MỘT Ý MUỐN GIỮ</span><h3>${esc(notebooks[0].title)}</h3><p>${esc(notebooks[0].body.slice(0,155))}${notebooks[0].body.length>155?'…':''}</p><button onclick="go('notes')">Mở sổ tay ${icon('arrow')}</button></section>`:''}<div class="l-home-quiet">${icon('sprout')}Hôm nay hiểu thêm một chút<br>cũng là một bước tiến.</div></aside></div>`};
 function routeLumiFromURL(){
-  const route=location.hash.slice(1).split('?')[0];
+  let route='';
+  const isHttp = typeof location !== 'undefined' && location.protocol && location.protocol.startsWith('http');
+  if(isHttp){
+    const pathPart = location.pathname.replace(/^\/+|\/+$/g,'').split('/')[0];
+    if(pathPart && pathPart!=='index.html' && pathPart!=='START-HERE.html' && pathPart!=='preview.html'){
+      route = pathPart;
+    }
+  }
+  if(!route){
+    route = (location.hash||'').replace(/^#\/?/,'').split('?')[0];
+  }
   if(lumiSession()){
     if(route==='auth'||route==='login'||route==='signup'||!route||route==='landing'){
       page='home';
-      location.hash='#home';
+      if(isHttp && location.pathname!=='/home'){
+        try{history.replaceState({lumiPage:'home'},'','/home'+(location.search||''));}catch(e){}
+      } else if(!isHttp){
+        location.hash='#home';
+      }
       render();
       return;
     }
@@ -135,7 +162,7 @@ function routeLumiFromURL(){
     authMode=route==='signup'?'signup':'login';page='auth';
   } else if(route==='auth'){
     page='auth';
-  } else if(Object.hasOwn(names,route)){
+  } else if(route && Object.hasOwn(names,route)){
     page=route;
   } else page='landing';
   render();

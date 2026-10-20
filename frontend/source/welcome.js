@@ -18,7 +18,12 @@ function enterLumi(mode){
     setLumiEntry('app');
     if($('publicRoot'))$('publicRoot').innerHTML='';
     page='home';
-    location.hash='#home';
+    const isHttp = typeof location !== 'undefined' && location.protocol && location.protocol.startsWith('http');
+    if(isHttp){
+      try{history.replaceState({lumiPage:'home'},'','/home'+(location.search||''));}catch(e){}
+    } else {
+      location.hash='#home';
+    }
     render();
     toast('Chào mừng bạn đến với Lumi AI!');
     return;
@@ -36,7 +41,17 @@ function setLumiEntry(mode){document.documentElement.dataset.entry=mode}
 render=function(){
   if(page==='landing'){setLumiEntry('public');$('publicRoot').innerHTML=landingPage();document.title='Lumi — Một góc riêng cho việc học';return}
   if(page==='auth'){
-    if(lumiSession()){page='home';location.hash='#home';render();return}
+    if(lumiSession()){
+      page='home';
+      const isHttp = typeof location !== 'undefined' && location.protocol && location.protocol.startsWith('http');
+      if(isHttp){
+        try{history.replaceState({lumiPage:'home'},'','/home'+(location.search||''));}catch(e){}
+      } else {
+        location.hash='#home';
+      }
+      render();
+      return;
+    }
     setLumiEntry('public');$('publicRoot').innerHTML=`<div class="l-auth-public"><header><a class="l-brand" href="#landing">${lBrand()}</a><button onclick="go('landing')">${icon('back')}Trang giới thiệu</button></header>${authPage()}<p class="l-auth-bottom">Học theo nhịp của bạn. Mỗi chút hiểu thêm đều có ý nghĩa.</p></div>`;document.title='Lumi — '+(authMode==='signup'?'Đăng ký':authMode==='reset'?'Khôi phục mật khẩu':'Đăng nhập');return
   }
   if(!lumiSession()){
@@ -116,13 +131,16 @@ function continueLumi(){
     let i=records.indexOf(target);
     if(i<0)i=0;
     sourceIndex=i;
+    if(typeof lumiActiveBackendSourceId!=='undefined')lumiActiveBackendSourceId=target.backendId||target.id;
+    try{localStorage.setItem('lumi-backend-source-id',target.backendId||target.id);}catch(e){}
+    if(typeof chatSourceIds!=='undefined')chatSourceIds=[target.id];
     const last=saved('lumi-last-read',null);
     readerPage=(last?.id===target.id&&last?.page)?last.page:saved('lumi-source-page-'+target.id,1);
     readerTab='chat';
     readingView='document';
     if(typeof viewSource==='function')viewSource(i);
-    else go(target.type==='VIDEO'?'video':'reader')
-  }else openUpload()
+    else go(target.type==='VIDEO'?'video':'reader');
+  }else openUpload();
 }
 home=function(){
   let firstName=userProfile.name.trim().split(' ').at(-1)||'bạn';
@@ -138,9 +156,10 @@ function routeLumiFromURL(){
   let route='';
   const isHttp = typeof location !== 'undefined' && location.protocol && location.protocol.startsWith('http');
   if(isHttp){
-    const pathPart = location.pathname.replace(/^\/+|\/+$/g,'').split('/')[0];
-    if(pathPart && pathPart!=='index.html' && pathPart!=='START-HERE.html' && pathPart!=='preview.html'){
-      route = pathPart;
+    const pathSegments = location.pathname.replace(/^\/+|\/+$/g,'').split('/').filter(Boolean);
+    const lastPart = (pathSegments.pop() || '').replace(/\.html$/i, '');
+    if(lastPart && lastPart!=='index' && lastPart!=='START-HERE' && lastPart!=='preview'){
+      route = lastPart;
     }
   }
   if(!route){
@@ -149,8 +168,10 @@ function routeLumiFromURL(){
   if(lumiSession()){
     if(route==='auth'||route==='login'||route==='signup'||!route||route==='landing'){
       page='home';
-      if(isHttp && location.pathname!=='/home'){
-        try{history.replaceState({lumiPage:'home'},'','/home'+(location.search||''));}catch(e){}
+      if(isHttp){
+        if(location.pathname!=='/home' || location.hash){
+          try{history.replaceState({lumiPage:'home'},'','/home'+(location.search||''));}catch(e){}
+        }
       } else if(!isHttp){
         location.hash='#home';
       }

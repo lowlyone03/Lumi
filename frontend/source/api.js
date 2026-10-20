@@ -4497,9 +4497,10 @@ function handleLumiRouteFromHash() {
   let route = '';
   const isHttp = typeof location !== 'undefined' && location.protocol && location.protocol.startsWith('http');
   if (isHttp) {
-    const pathPart = location.pathname.replace(/^\/+|\/+$/g, '').split('/')[0];
-    if (pathPart && pathPart !== 'index.html' && pathPart !== 'START-HERE.html' && pathPart !== 'preview.html') {
-      route = pathPart;
+    const pathSegments = location.pathname.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+    const lastPart = (pathSegments.pop() || '').replace(/\.html$/i, '');
+    if (lastPart && lastPart !== 'index' && lastPart !== 'START-HERE' && lastPart !== 'preview') {
+      route = lastPart;
     }
   }
   if (!route) {
@@ -4509,8 +4510,10 @@ function handleLumiRouteFromHash() {
   if (typeof lumiSession === 'function' && lumiSession()) {
     if (route === 'auth' || route === 'login' || route === 'signup' || !route || route === 'landing') {
       page = 'home';
-      if (isHttp && location.pathname !== '/home') {
-        try { history.replaceState({ lumiPage: 'home' }, '', '/home' + (location.search || '')); } catch(e) {}
+      if (isHttp) {
+        if (location.pathname !== '/home' || location.hash) {
+          try { history.replaceState({ lumiPage: 'home' }, '', '/home' + (location.search || '')); } catch(e) {}
+        }
       } else if (!isHttp) {
         location.hash = '#home';
       }

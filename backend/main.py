@@ -73,6 +73,15 @@ def create_application() -> FastAPI:
         allow_headers=["*"],
     )
 
+    @application.middleware("http")
+    async def add_no_cache_for_app_assets(request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/app"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
     # Đăng ký Exception Handlers toàn cục
     application.add_exception_handler(StudyFlowException, studyflow_exception_handler)
     application.add_exception_handler(HTTPException, http_exception_handler)

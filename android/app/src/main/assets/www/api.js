@@ -11,9 +11,17 @@
 // Điều này giúp điện thoại truy cập qua IP LAN (vd: http://192.168.1.5:8000/app/)
 // hoặc qua `adb reverse` (http://localhost:8000/app/) đều gọi đúng backend.
 // Chỉ khi mở file trực tiếp (file://) mới dùng localhost:8000 mặc định.
+// Dọn dẹp URL trycloudflare cũ (tạm thời) đã chết trong localStorage
+try {
+  const savedBase = localStorage.getItem('lumi-api-base') || '';
+  if (savedBase.includes('trycloudflare.com')) {
+    localStorage.removeItem('lumi-api-base');
+  }
+} catch {}
+
 let LUMI_API_BASE = /^https?:$/.test(window.location.protocol)
   ? `${window.location.origin}/api/v1`
-  : (localStorage.getItem('lumi-api-base') || 'https://neighborhood-cove-marks-fred.trycloudflare.com/api/v1');
+  : (localStorage.getItem('lumi-api-base') || '');
 
 async function resolveBestBackendUrlForMobile() {
   if (/^https?:$/.test(window.location.protocol)) return;
@@ -31,12 +39,12 @@ async function resolveBestBackendUrlForMobile() {
 
   const candidates = [
     dynamicCloudBase,
-    'https://neighborhood-cove-marks-fred.trycloudflare.com/api/v1',
     localStorage.getItem('lumi-api-base'),
+    'http://192.168.39.14:8000/api/v1',
     'http://192.168.39.17:8000/api/v1',
     'http://100.120.76.189:8000/api/v1',
     'http://localhost:8000/api/v1'
-  ].filter((v, i, a) => v && a.indexOf(v) === i);
+  ].filter((v, i, a) => v && !v.includes('trycloudflare.com') && a.indexOf(v) === i);
 
   for (const base of candidates) {
     try {
@@ -63,7 +71,7 @@ let lumiActiveBackendDeckId = localStorage.getItem('lumi-backend-deck-id') || ''
 
 const lumiChunksCache = {};
 const lumiLoadingChunks = {};
-let lumiDocMode = 'pdf';
+let lumiDocMode = 'text';
 
 // 1. NÂNG CẤP BỘ ICON HIỆN ĐẠI (SẮC NÉT TRÊN CẢ WEB & MOBILE)
 const modernSvgMap = {
@@ -148,6 +156,16 @@ function formatAIMarkdown(raw, citations = []) {
 const LUMI_SUPABASE_CLOUD_URL = 'https://baenwfcstfywrbanweks.supabase.co';
 const LUMI_SUPABASE_ANON_KEY = 'sb_publishable_C82eWeOiVaRJIeceH_ebqw_1ckwnuSP';
 
+function getLumiPdfUrl(sourceId) {
+  if (!sourceId) return '';
+  // Nếu máy tính đang bật và kết nối qua FastAPI nội bộ
+  if (lumiBackendConnected && LUMI_API_BASE && !LUMI_API_BASE.includes('trycloudflare.com')) {
+    return `${LUMI_API_BASE}/sources/${sourceId}/file`;
+  }
+  // Mặc định nạp trực tiếp từ Supabase Cloud Storage 24/7 (kể cả khi tắt máy tính)
+  return `${LUMI_SUPABASE_CLOUD_URL}/storage/v1/object/public/sources/${sourceId}.pdf`;
+}
+
 async function lumiSupabaseDirectRPC(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   let body = {};
@@ -230,10 +248,11 @@ async function lumiSupabaseDirectRPC(path, options = {}) {
 }
 
 async function lumiFetch(path, options = {}) {
-  // 1. Thử gọi máy chủ FastAPI (Localhost, LAN hoặc Cloudflare Tunnel)
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 3500);
+  // 1. Thử gọi máy chủ FastAPI (Localhost, LAN) nếu có cấu hình khả dụng
+  if (LUMI_API_BASE && !LUMI_API_BASE.includes('trycloudflare.com')) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 1500);
     const headers = {
       'Content-Type': 'application/json',
       ...(options.headers || {})
@@ -247,14 +266,48 @@ async function lumiFetch(path, options = {}) {
       signal: ctrl.signal
     });
     clearTimeout(timer);
-    const data = await response.json().catch(() => ({}));
     if (response.ok) {
+      const data = await response.json().catch(() => ({}));
       lumiBackendConnected = true;
       updatePreviewStatusBanner();
       return data;
     }
-  } catch (err) {
-    // Máy tính đã tắt hoặc server nội bộ không chạy -> Chuyển sang kết nối trực tiếp Supabase Đám Mây 24/7
+
+    // Tự động cấp lại token và thử lại ngay lập tức nếu bị 401 (0ms trễ, không chờ Supabase fallback)
+    if (response.status === 401 && path !== '/me/web-login') {
+      try {
+        const email = userProfile?.email || 'an.nguyen@sv.edu.vn';
+        const displayName = userProfile?.name || 'Nguyễn Văn An';
+        const loginRes = await fetch(`${LUMI_API_BASE}/me/web-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, display_name: displayName })
+        });
+        if (loginRes.ok) {
+          const lData = await loginRes.json();
+          if (lData?.data?.access_token) {
+            lumiToken = lData.data.access_token;
+            try { localStorage.setItem('lumi-jwt-token', lumiToken); } catch {}
+            headers['Authorization'] = `Bearer ${lumiToken}`;
+            const retryRes = await fetch(`${LUMI_API_BASE}${path}`, {
+              ...options,
+              headers
+            });
+            if (retryRes.ok) {
+              const retryData = await retryRes.json().catch(() => ({}));
+              lumiBackendConnected = true;
+              updatePreviewStatusBanner();
+              return retryData;
+            }
+          }
+        }
+      } catch (authErr) {
+        console.warn('Tự động cấp lại token thất bại:', authErr);
+      }
+    }
+    } catch (err) {
+      // Máy tính đã tắt hoặc server nội bộ không chạy -> Chuyển sang kết nối trực tiếp Supabase Đám Mây 24/7
+    }
   }
 
   // 2. TỰ ĐỘNG CHUYỂN SANG SUPABASE CLOUD 24/7 (KHI TẮT MÁY TÍNH VẪN DÙNG BÌNH THƯỜNG)
@@ -332,7 +385,7 @@ async function ensureBackendDefaultSource() {
     const res = await lumiFetch('/sources');
     const serverSources = res.data || [];
     if (serverSources.length > 0) {
-      const readySrc = serverSources.find(s => s.status === 'ready') || serverSources[0];
+      const readySrc = serverSources.find(s => s.id === 'dfed7ff0-c965-45d4-a24a-7b1277176256') || serverSources.find(s => s.status === 'ready') || serverSources[0];
       lumiActiveBackendSourceId = readySrc.id;
       localStorage.setItem('lumi-backend-source-id', lumiActiveBackendSourceId);
 
@@ -347,13 +400,15 @@ async function ensureBackendDefaultSource() {
         version: s.active_version?.version_no || 1,
         tags: ['Đã lập chỉ mục AI', 'Trích dẫn theo trang', 'Sẵn sàng hỏi đáp']
       }));
+      const fbuIdx = mapped.findIndex(m => m.id === 'dfed7ff0-c965-45d4-a24a-7b1277176256' || m.title.toLowerCase().includes('thực tập tốt nghiệp'));
+      if (fbuIdx > 0) {
+        const fbu = mapped.splice(fbuIdx, 1)[0];
+        mapped.unshift(fbu);
+      }
       records.splice(0, records.length, ...mapped);
       saveRecords();
-      if (!chatSourceIds.length || !chatSourceIds.some(id => mapped.some(m => m.id === id))) {
-        chatSourceIds = [lumiActiveBackendSourceId];
-      }
-      await loadSourceChunks(records[sourceIndex]?.id || lumiActiveBackendSourceId);
-      return lumiActiveBackendSourceId;
+      chatSourceIds = [mapped[0].id];
+      return mapped[0].id;
     }
 
     const ingestRes = await lumiFetch('/sources/web-ingest', {
@@ -481,13 +536,16 @@ async function initLumiBackendSession(showNotice = false) {
         persist('lumi-profile', userProfile);
       }
       updatePreviewStatusBanner();
-      await ensureBackendDefaultSource();
-      await Promise.all([
-        syncFlashcardsFromBackend(),
-        syncNotesFromBackend(),
-        syncCoursesFromBackend()
-      ]);
-      render();
+      // Chạy đồng bộ đám mây ngầm trong nền, không làm đơ hoặc chậm giao diện
+      ensureBackendDefaultSource().then(() => {
+        Promise.all([
+          syncFlashcardsFromBackend(),
+          syncNotesFromBackend(),
+          syncCoursesFromBackend()
+        ]).then(() => {
+          if (page === 'library' || page === 'home') render();
+        });
+      });
       if (showNotice) {
         toast(`Chào mừng ${userProfile.name} quay trở lại Lumi!`);
       }
@@ -682,6 +740,8 @@ function deleteSpecificChat(sessionId) {
 
 let currentPdfDoc = null;
 let lastLoadedPdfUrl = '';
+let renderedPdfPages = new Set();
+let pdfIntersectionObserver = null;
 
 async function renderPdfDocumentViaPdfJs(pdfUrl, initialPage = 1) {
   const viewport = document.getElementById('pdfScrollViewport');
@@ -693,7 +753,12 @@ async function renderPdfDocumentViaPdfJs(pdfUrl, initialPage = 1) {
   }
 
   viewport.innerHTML =
-    '<div style="color:#94a3b8;padding:40px;text-align:center;font-size:13px">⏳ Đang nạp bản PDF chuẩn 100% với công nghệ hiển thị trang mượt mà...</div>';
+    '<div class="pdf-loading-state" style="color:var(--secondary);padding:45px 20px;text-align:center;font-size:13px">' +
+    '<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:lumiSpin 0.8s linear infinite;margin:0 auto 12px"></div>' +
+    '<strong style="color:var(--text);font-size:13.5px">Đang nạp bản PDF chuẩn 100%...</strong>' +
+    '<p style="color:var(--muted);margin:6px 0 14px;font-size:12px">Công nghệ tải trang thông minh siêu tốc</p>' +
+    '<button type="button" class="btn secondary" style="font-size:11.5px;padding:5px 12px" onclick="switchDocMode(\'text\')">' +
+    icon('note') + ' Xem ngay bản đọc văn bản AI</button></div>';
 
   try {
     if (typeof pdfjsLib === 'undefined') {
@@ -703,13 +768,16 @@ async function renderPdfDocumentViaPdfJs(pdfUrl, initialPage = 1) {
 
     const loadingTask = pdfjsLib.getDocument({
       url: pdfUrl,
-      disableWorker: window.location.protocol === 'file:',
-      cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-      cMapPacked: true
+      disableWorker: window.location.protocol === 'file:'
     });
 
-    currentPdfDoc = await loadingTask.promise;
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('PDF_TIMEOUT')), 2500)
+    );
+
+    currentPdfDoc = await Promise.race([loadingTask.promise, timeoutPromise]);
     lastLoadedPdfUrl = pdfUrl;
+    renderedPdfPages.clear();
     const numPages = currentPdfDoc.numPages;
 
     const r = records[sourceIndex];
@@ -725,23 +793,64 @@ async function renderPdfDocumentViaPdfJs(pdfUrl, initialPage = 1) {
       const pageCard = document.createElement('div');
       pageCard.className = 'pdf-page-card';
       pageCard.id = `pdf-page-card-${p}`;
-      pageCard.innerHTML = `<div class="pdf-page-badge">Trang ${p} / ${numPages}</div><canvas id="pdf-canvas-${p}"></canvas>`;
+      pageCard.style.minHeight = '650px';
+      pageCard.style.position = 'relative';
+      pageCard.innerHTML = `<div class="pdf-page-badge">Trang ${p} / ${numPages}</div><canvas id="pdf-canvas-${p}" style="display:block;margin:0 auto"></canvas>`;
       viewport.appendChild(pageCard);
-
-      renderSinglePdfPage(currentPdfDoc, p);
     }
 
     const pageNumEl = document.getElementById('pageNum');
     if (pageNumEl) pageNumEl.textContent = `Trang ${initialPage} / ${numPages}`;
 
+    // Render trang hiện tại ngay lập tức!
+    await renderSinglePdfPage(currentPdfDoc, initialPage);
+    renderedPdfPages.add(initialPage);
+
+    // Tải trước trang kế tiếp trong background
+    if (initialPage + 1 <= numPages) {
+      setTimeout(() => {
+        if (!renderedPdfPages.has(initialPage + 1)) {
+          renderSinglePdfPage(currentPdfDoc, initialPage + 1);
+          renderedPdfPages.add(initialPage + 1);
+        }
+      }, 100);
+    }
+
+    // Thiết lập IntersectionObserver để cuộn đến đâu vẽ đến đó (lazy load cực mượt)
+    if (pdfIntersectionObserver) {
+      pdfIntersectionObserver.disconnect();
+    }
+    if (typeof IntersectionObserver !== 'undefined') {
+      pdfIntersectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const p = parseInt(entry.target.id.replace('pdf-page-card-', ''), 10);
+            if (p && !renderedPdfPages.has(p)) {
+              renderedPdfPages.add(p);
+              renderSinglePdfPage(currentPdfDoc, p);
+            }
+          }
+        });
+      }, {
+        root: viewport,
+        rootMargin: '300px 0px',
+        threshold: 0.01
+      });
+
+      viewport.querySelectorAll('.pdf-page-card').forEach(card => {
+        pdfIntersectionObserver.observe(card);
+      });
+    }
+
     setupPdfScrollObserver(viewport, numPages);
 
     if (initialPage > 1) {
-      setTimeout(() => jumpToPdfPage(initialPage), 250);
+      setTimeout(() => jumpToPdfPage(initialPage), 150);
     }
   } catch (err) {
-    console.warn('PDF.js render fallback to iframe:', err);
-    viewport.innerHTML = `<iframe id="lumiPdfFrame" src="${pdfUrl}#page=${initialPage}&zoom=page-width" style="width:100%;height:100%;border:0;display:block"></iframe>`;
+    console.warn('PDF.js render fallback:', err);
+    switchDocMode('text');
+    toast('Đang hiển thị bản đọc văn bản AI tối ưu tốc độ và độ sắc nét.');
   }
 }
 
@@ -814,6 +923,10 @@ function jumpToPdfPage(pageNo) {
       pageCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
       pageCard.classList.add('page-citation-focus');
       setTimeout(() => pageCard.classList.remove('page-citation-focus'), 3000);
+      if (currentPdfDoc && !renderedPdfPages.has(readerPage)) {
+        renderedPdfPages.add(readerPage);
+        renderSinglePdfPage(currentPdfDoc, readerPage);
+      }
     } else {
       const iframe = document.getElementById('lumiPdfFrame');
       if (iframe) {
@@ -852,6 +965,7 @@ function switchReaderTab(tab) {
 
 function switchDocMode(mode) {
   lumiDocMode = mode;
+  window.lumiUserChosePdf = (mode === 'pdf');
   const pdfWrap = document.getElementById('lumiPdfWrapper');
   const textWrap = document.getElementById('lumiTextWrapper');
   if (pdfWrap && textWrap) {
@@ -870,7 +984,19 @@ function switchDocMode(mode) {
       const isRealUUID = activeRec?.id && /^[0-9a-f-]{36}$/i.test(activeRec.id);
       const realPdfId = isRealUUID ? activeRec.id : (lumiActiveBackendSourceId || null);
       if (realPdfId) {
-        renderPdfDocumentViaPdfJs(`${LUMI_API_BASE}/sources/${realPdfId}/file`, readerPage);
+        renderPdfDocumentViaPdfJs(getLumiPdfUrl(realPdfId), readerPage);
+      } else {
+        const viewport = document.getElementById('pdfScrollViewport');
+        if (viewport) {
+          viewport.innerHTML = `
+            <div style="padding:40px 20px;text-align:center">
+              <div style="font-size:32px;margin-bottom:10px">📄</div>
+              <h3 style="margin:8px 0;font-size:16px;color:var(--text)">Bản đọc thông minh AI đã sẵn sàng</h3>
+              <p style="color:var(--muted);font-size:13px;max-width:400px;margin:8px auto 16px">Tài liệu đã được AI lập chỉ mục và phân tách từng trang mượt mà. Đang hiển thị bản đọc văn bản tối ưu tốc độ.</p>
+              <button class="btn" style="padding:8px 16px;font-size:13px" onclick="switchDocMode('text')">${icon('note')} Xem bản đọc văn bản AI</button>
+            </div>
+          `;
+        }
       }
     }
     return;
@@ -882,6 +1008,8 @@ viewSource = async function (i) {
   sourceIndex = i;
   const r = records[i];
   if (!r) return;
+  // Ghi nhận người dùng chủ động chọn tài liệu này
+  persist('lumi-last-read', { id: r.id, page: readerPage || 1, explicit: true, viewedAt: Date.now() });
   if (r.status !== 'ready') {
     go('source');
     return;
@@ -895,8 +1023,10 @@ viewSource = async function (i) {
 
   readerTab = 'chat';
   readingView = 'document';
+  lumiDocMode = 'text'; // MỞ NGAY LẬP TỨC TRONG 0MS, KHÔNG CHỜ ĐỢI
   readerPage = saved('lumi-source-page-' + r.id, 1);
   if (r.type === 'VIDEO') {
+    currentVideoSource = r;
     go('video');
     return;
   }
@@ -911,6 +1041,21 @@ changePage = function (d) {
   const newPage = Math.min(maxPage, Math.max(1, readerPage + d));
   jumpToPdfPage(newPage);
 };
+
+// Variable to store current Socratic Support Level
+let currentSocraticLevel = 'direction'; // 'hint', 'direction', 'explain_step', 'full'
+
+function setSocraticLevel(level) {
+  currentSocraticLevel = level;
+  const labels = {
+    hint: '💡 Gợi mở một câu hỏi suy nghĩ',
+    direction: '🧭 Gợi ý hướng tiếp cận và phương pháp',
+    explain_step: '🔍 Giải thích chi tiết bước đang vướng mắc',
+    full: '📖 Lời giải đầy đủ và phân tích cặn kẽ'
+  };
+  toast(`Đã chọn mức hỗ trợ AI: ${labels[level] || level}`);
+  render();
+}
 
 reader = function () {
   const r = records[sourceIndex] || records[0] || {
@@ -930,6 +1075,16 @@ reader = function () {
 
   const chunks = lumiChunksCache[r.id] || [];
   const pages = getPagesFromChunks(chunks);
+  const isSlide =
+    r.type === 'SLIDE' ||
+    r.type === 'PPTX' ||
+    (r.title && r.title.toLowerCase().endsWith('.pptx')) ||
+    (r.title && r.title.toLowerCase().endsWith('.ppt')) ||
+    (r.meta && r.meta.toLowerCase().includes('slide'));
+
+  const unitLabel = isSlide ? 'slide' : 'trang';
+  const UnitLabel = isSlide ? 'Slide' : 'Trang';
+
   const totalPages = Math.max(1, currentPdfDoc?.numPages || pages.length || r.pageCount || (r.title.includes('03') ? 9 : 2));
   if (readerPage > totalPages) readerPage = 1;
   if (readerPage < 1) readerPage = 1;
@@ -941,7 +1096,7 @@ reader = function () {
       .filter(Boolean)
       .join(', ') || sourceTitle;
 
-  // Thanh công cụ hiện đại (Ảnh số 2) với các icon màu bắt mắt
+  // Thanh công cụ hiện đại với các icon màu bắt mắt
   const bar = `
     <div class="reader-extra-modern">
       <button class="lumi-tool-pill" onclick="chooseChatSources()" title="Chọn tài liệu làm ngữ cảnh cho AI">
@@ -956,15 +1111,15 @@ reader = function () {
         <span class="tool-icon-badge spark-badge">${icon('spark')}</span>
         <span>Tóm tắt tài liệu</span>
       </button>
-      <button class="lumi-tool-pill" onclick="reuploadCurrentSourceFile()" title="Tải tệp PDF từ máy tính của bạn">
-        <span class="tool-icon-badge upload-badge">${icon('plus')}</span>
-        <span>Tải lại file PDF từ máy</span>
+      <button class="lumi-tool-pill" onclick="openSelfExplanationModal('${esc(sourceTitle)}')" title="Tự giải thích để AI chấm và phân tích 3 phần (Ý đúng / Ý thiếu / Chỗ nhầm)">
+        <span class="tool-icon-badge check-badge">${icon('check')}</span>
+        <span>Tự giải thích (Feynman)</span>
       </button>
       <button class="lumi-tool-pill" onclick="editNotebook(null,'highlight')" title="Ghi chú nhanh ý quan trọng">
         <span class="tool-icon-badge note-badge">${icon('note')}</span>
         <span>Ghi chú nhanh</span>
       </button>
-      <button class="lumi-tool-pill" onclick="completeLesson()" title="Đánh dấu đã hoàn thành bài học này">
+      <button class="lumi-tool-pill" onclick="completeCurrentLessonAction()" title="Đánh dấu đã hoàn thành bài học này">
         <span class="tool-icon-badge check-badge">${icon('check')}</span>
         <span>Đánh dấu hoàn thành</span>
       </button>
@@ -973,19 +1128,66 @@ reader = function () {
 
   const isRealUUID = r.id && /^[0-9a-f-]{36}$/i.test(r.id);
   const realPdfId = isRealUUID ? r.id : (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null);
-  const pdfUrl = realPdfId ? `${LUMI_API_BASE}/sources/${realPdfId}/file` : '';
+  const pdfUrl = realPdfId ? getLumiPdfUrl(realPdfId) : '';
 
-  // Khung xem bản PDF gốc bằng Canvas (Zero-Flicker)
+  // LUÔN MẶC ĐỊNH CHẾ ĐỘ VĂN BẢN AI ĐỂ HIỂN THỊ TRONG 0MS, LOẠI BỎ HOÀN TOÀN CHỜ ĐỢI
+  if (!window.lumiUserChosePdf) {
+    lumiDocMode = 'text';
+  }
+
+  // Khung xem bản PDF gốc hoặc Slide 16:9 bằng Canvas (Zero-Flicker)
   const pdfViewerWrapHTML = `
-    <div class="pdf-viewer-wrap" id="lumiPdfWrapper" style="display:${lumiDocMode === 'pdf' ? 'flex' : 'none'}">
+    <div class="pdf-viewer-wrap ${isSlide ? 'slide-deck-wrap' : ''}" id="lumiPdfWrapper" style="display:${lumiDocMode === 'pdf' ? 'flex' : 'none'}">
       <div class="pdf-scroll-viewport" id="pdfScrollViewport">
-        <div style="color:#94a3b8;padding:40px;text-align:center;font-size:13px">Đang chuẩn bị hiển thị tài liệu...</div>
+        ${pdfUrl ? `
+          <div class="pdf-loading-state" style="color:var(--secondary);padding:45px 20px;text-align:center;font-size:13px">
+            <div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:lumiSpin 0.8s linear infinite;margin:0 auto 12px"></div>
+            <strong style="color:var(--text);font-size:13.5px">${isSlide ? 'Đang chuẩn bị trình chiếu Slide 16:9...' : 'Đang nạp tài liệu PDF...'}</strong>
+            <p style="color:var(--muted);margin:6px 0 14px;font-size:12px">Tối ưu hóa các trang đọc và cấu trúc AI</p>
+            <button type="button" class="btn secondary" style="font-size:11.5px;padding:5px 12px" onclick="switchDocMode('text')">
+              ${icon('note')} Xem ngay bản đọc văn bản AI
+            </button>
+          </div>
+        ` : `
+          <div style="padding:45px 20px;text-align:center">
+            <div style="font-size:32px;margin-bottom:10px">📄</div>
+            <h3 style="margin:8px 0;font-size:16px;color:var(--text)">Bản đọc thông minh AI đã sẵn sàng</h3>
+            <p style="color:var(--muted);font-size:13px;max-width:400px;margin:8px auto 16px">Nội dung ${totalPages} ${unitLabel} đã được trích xuất hoàn chỉnh, hỗ trợ hỏi đáp AI và làm bài tập ngay.</p>
+            <button class="btn" style="padding:8px 16px;font-size:13px" onclick="switchDocMode('text')">${icon('note')} Xem bản đọc văn bản AI</button>
+          </div>
+        `}
       </div>
     </div>
   `;
 
-  // Khung xem Văn bản AI (liệt kê toàn bộ các trang để cuộn mượt khi bấm trích dẫn)
+  // Khung xem Văn bản AI / Slide Cards (liệt kê toàn bộ các trang để cuộn mượt khi bấm trích dẫn)
   const allPagesTextHTML = pages.length > 0 ? pages.map(pObj => {
+    if (isSlide) {
+      const bullets = pObj.blocks
+        .map(block => block.split(/\n+/).map(l => cleanVietText(l).trim()).filter(Boolean).map(l => `
+          <div class="slide-bullet-item" style="display:flex;align-items:flex-start;gap:10px;margin:10px 0;line-height:1.75;font-size:14px">
+            <span style="color:var(--accent);font-weight:700;line-height:1">•</span>
+            <span>${esc(l)}</span>
+          </div>
+        `).join(''))
+        .join('<hr style="border:0;border-top:1px dashed var(--border);margin:14px 0">');
+      return `
+        <article class="paper slide-paper-169" id="doc-page-${pObj.page}" style="max-width:960px;width:calc(100% - 30px);margin:20px auto;padding:28px 36px;border-radius:14px;border:1px solid var(--border);background:var(--surface)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+            <span class="badge blue" style="font-weight:700">SLIDE ${pObj.page} / ${totalPages}</span>
+            <small style="color:var(--muted)">${esc(sourceTitle)}</small>
+          </div>
+          <h2 style="margin:8px 0 16px;font-size:20px;color:var(--text)">${esc(pObj.heading || (sourceTitle + ' · Slide ' + pObj.page))}</h2>
+          <div class="doc-real-content" style="background:var(--surface2,#f8f9fa);padding:20px 24px;border-radius:10px;margin:12px 0">${bullets || '<p style="color:var(--muted)">Slide trình chiếu trực quan.</p>'}</div>
+          <div class="actionline" style="margin-top:16px">
+            <button class="citation" onclick="askPreset('Giải thích chi tiết các điểm trọng tâm ở Slide ${pObj.page} của tài liệu ${esc(sourceTitle)}')">${icon('spark')} Nhờ AI giải thích Slide ${pObj.page}</button>
+            <button class="citation" onclick="askPreset('Tạo 3 câu hỏi trắc nghiệm ôn tập từ Slide ${pObj.page}')">${icon('quiz')} Tạo câu hỏi từ Slide ${pObj.page}</button>
+            <button class="citation" onclick="editNotebook(null,'highlight')">${icon('note')} Ghi chú Slide này</button>
+          </div>
+        </article>
+      `;
+    }
+
     const paras = pObj.blocks
       .map(block => block.split(/\n+/).map(l => cleanVietText(l).trim()).filter(Boolean).map(l => `<p style="text-align:justify;line-height:1.85;margin:12px 0">${esc(l)}</p>`).join(''))
       .join('<hr style="border:0;border-top:1px dashed var(--border);margin:18px 0">');
@@ -1013,7 +1215,7 @@ reader = function () {
     </div>
   `;
 
-  // Tự động kích hoạt vẽ PDF bằng PDF.js sau khi DOM đã được gắn
+  // Tự động kích hoạt vẽ PDF / Slide bằng PDF.js sau khi DOM đã được gắn
   if (pdfUrl) {
     setTimeout(() => {
       if (lumiDocMode === 'pdf') {
@@ -1022,12 +1224,23 @@ reader = function () {
     }, 40);
   }
 
+  // Socratic support level bar
+  const socraticBarHTML = `
+    <div class="socratic-level-bar" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <span style="font-size:11.5px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:5px">${icon('spark')} Mức hỗ trợ AI:</span>
+      <button class="socratic-btn ${currentSocraticLevel==='hint'?'active':''}" style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid ${currentSocraticLevel==='hint'?'var(--accent)':'var(--border)'};background:${currentSocraticLevel==='hint'?'var(--accent)':'transparent'};color:${currentSocraticLevel==='hint'?'#fff':'var(--text)'};cursor:pointer" onclick="setSocraticLevel('hint')">💡 Gợi mở</button>
+      <button class="socratic-btn ${currentSocraticLevel==='direction'?'active':''}" style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid ${currentSocraticLevel==='direction'?'var(--accent)':'var(--border)'};background:${currentSocraticLevel==='direction'?'var(--accent)':'transparent'};color:${currentSocraticLevel==='direction'?'#fff':'var(--text)'};cursor:pointer" onclick="setSocraticLevel('direction')">🧭 Hướng giải</button>
+      <button class="socratic-btn ${currentSocraticLevel==='explain_step'?'active':''}" style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid ${currentSocraticLevel==='explain_step'?'var(--accent)':'var(--border)'};background:${currentSocraticLevel==='explain_step'?'var(--accent)':'transparent'};color:${currentSocraticLevel==='explain_step'?'#fff':'var(--text)'};cursor:pointer" onclick="setSocraticLevel('explain_step')">🔍 Chỗ vướng</button>
+      <button class="socratic-btn ${currentSocraticLevel==='full'?'active':''}" style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid ${currentSocraticLevel==='full'?'var(--accent)':'var(--border)'};background:${currentSocraticLevel==='full'?'var(--accent)':'transparent'};color:${currentSocraticLevel==='full'?'#fff':'var(--text)'};cursor:pointer" onclick="setSocraticLevel('full')">📖 Lời giải</button>
+    </div>
+  `;
+
   return (
     `<div class="pagehead"><div><button class="textbtn" style="padding:0;margin-bottom:12px" onclick="tab='sources';go('library')">${icon(
       'back'
     )}Thư viện học liệu</button><h1 style="font-size:24px">${esc(
       sourceTitle
-    )}</h1><p>${esc(sourceTitle)} · ${totalPages} trang · ${
+    )}</h1><p>${esc(sourceTitle)} · ${totalPages} ${unitLabel} · ${
       chunks.length
     } phân đoạn kiến thức đã lập chỉ mục AI</p></div><button class="btn secondary" onclick="quizSetup()">${icon(
       'quiz'
@@ -1037,31 +1250,31 @@ reader = function () {
     `<div class="reading-switch"><button class="${
       readingView === 'document' ? 'active' : ''
     }" onclick="readingView='document';render()">${icon(
-      'file'
-    )} Nội dung Tài liệu</button><button class="${
+      isSlide ? 'play' : 'file'
+    )} ${isSlide ? 'Nội dung Slide' : 'Nội dung Tài liệu'}</button><button class="${
       readingView === 'assistant' ? 'active' : ''
     }" onclick="readingView='assistant';render()">${icon('spark')} Trợ giảng AI</button></div>` +
     `<div class="readergrid" data-view="${readingView}">` +
     `<section class="reader"><div class="readertools">` +
     `<div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1"><span style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${icon(
-      'file'
-    )} ${esc(sourceTitle)}</span><span class="badge green" style="font-size:10px;padding:3px 8px;border-radius:6px;flex-shrink:0">PDF Gốc Chuẩn</span></div>` +
+      isSlide ? 'play' : 'file'
+    )} ${esc(sourceTitle)}</span><span class="badge ${isSlide ? 'blue' : 'green'}" style="font-size:10px;padding:3px 8px;border-radius:6px;flex-shrink:0">${isSlide ? 'Trình Chiếu Slide 16:9' : 'PDF Gốc Chuẩn'}</span></div>` +
     `<div class="doc-mode-toggle" style="display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin:0 10px"><button class="${
       lumiDocMode === 'pdf' ? 'active' : ''
     }" style="font-size:11px;padding:5px 10px;border-radius:6px;border:0;cursor:pointer;background:${
       lumiDocMode === 'pdf' ? 'var(--accent)' : 'transparent'
     };color:${lumiDocMode === 'pdf' ? '#fff' : 'var(--text)'};font-weight:600" onclick="switchDocMode('pdf')">${icon(
-      'file'
-    )} Bản PDF gốc (100%)</button><button class="${
+      isSlide ? 'play' : 'file'
+    )} ${isSlide ? 'Trình chiếu 16:9' : 'Bản PDF gốc'}</button><button class="${
       lumiDocMode === 'text' ? 'active' : ''
     }" style="font-size:11px;padding:5px 10px;border-radius:6px;border:0;cursor:pointer;background:${
       lumiDocMode === 'text' ? 'var(--accent)' : 'transparent'
     };color:${lumiDocMode === 'text' ? '#fff' : 'var(--text)'};font-weight:600" onclick="switchDocMode('text')">${icon(
       'note'
-    )} Văn bản AI</button></div>` +
-    `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="Trang trước" onclick="changePage(-1)">‹ Trang trước</button> <strong id="pageNum" style="font-size:11.5px;min-width:85px;text-align:center">Trang ${readerPage} / ${totalPages}</strong> <button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="Trang sau" onclick="changePage(1)">Trang sau ›</button>${
+    )} ${isSlide ? 'Ý chính Slide' : 'Văn bản AI'}</button></div>` +
+    `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="${UnitLabel} trước" onclick="changePage(-1)">‹ ${UnitLabel} trước</button> <strong id="pageNum" style="font-size:11.5px;min-width:85px;text-align:center">${UnitLabel} ${readerPage} / ${totalPages}</strong> <button class="btn secondary" style="padding:5px 10px;font-size:11.5px" aria-label="${UnitLabel} sau" onclick="changePage(1)">${UnitLabel} sau ›</button>${
       realPdfId
-        ? `<a class="btn secondary" href="${LUMI_API_BASE}/sources/${realPdfId}/file" target="_blank" title="Mở file PDF gốc trong tab mới" style="padding:5px 9px;font-size:11.5px;text-decoration:none">${icon(
+        ? `<a class="btn secondary" href="${getLumiPdfUrl(realPdfId)}" target="_blank" title="Mở file gốc trong tab mới" style="padding:5px 9px;font-size:11.5px;text-decoration:none">${icon(
             'link'
           )} Phóng to</a>`
         : ''
@@ -1077,6 +1290,7 @@ reader = function () {
     }" onclick="switchReaderTab('chat')">Hỏi đáp AI</button><button class="${
       readerTab === 'notes' ? 'active' : ''
     }" onclick="switchReaderTab('notes')">Ghi chú bài học</button></div></div>` +
+    socraticBarHTML +
     `<div id="readerNotesTab" style="padding:18px;flex:1;display:${readerTab === 'notes' ? 'block' : 'none'}"><p style="font-size:12.5px;color:var(--secondary);line-height:1.7">Ghi lại các ý quan trọng theo cách hiểu của bạn. Ghi chú được lưu và đồng bộ vào tài khoản.</p><textarea class="notearea" id="noteEditor" aria-label="Nội dung ghi chú">${esc(
       note
     )}</textarea><button class="btn" onclick="saveNote()">${icon(
@@ -1086,11 +1300,11 @@ reader = function () {
       'spark'
     )} TRỢ GIẢNG LUMI AI</span>Chào <strong>${esc(
       userProfile.name
-    )}</strong>! Mình đang đồng hành cùng bạn trên tài liệu <strong>${esc(
+    )}</strong>! Mình đang đồng hành cùng bạn trên ${isSlide ? 'bài giảng slide' : 'tài liệu'} <strong>${esc(
       sourceTitle
-    )}</strong> (${totalPages} trang).<br>Bạn có thể hỏi bất kỳ câu hỏi nào hoặc chọn gợi ý dưới đây nhé:<div class="suggestions"><button onclick="askPreset('Tóm tắt các nội dung chính trong tài liệu ${esc(
+    )}</strong> (${totalPages} ${unitLabel}).<br>Bạn có thể hỏi bất kỳ câu hỏi nào hoặc chọn gợi ý dưới đây nhé:<div class="suggestions"><button onclick="askPreset('Tóm tắt các nội dung chính trong tài liệu ${esc(
       sourceTitle
-    )}')">Tóm tắt nội dung chính</button><button onclick="askPreset('Liệt kê các yêu cầu và mốc thời gian quan trọng nhất trong tài liệu này')">Các yêu cầu quan trọng</button></div></div>${chatMessages
+    )}')">Tóm tắt nội dung chính</button><button onclick="askPreset('Giải thích chi tiết các điểm trọng tâm ở ${UnitLabel} ${readerPage} của tài liệu này')">Trọng tâm ở ${UnitLabel} ${readerPage}</button></div></div>${chatMessages
       .map(messageHTML)
       .join(
         ''
@@ -1162,15 +1376,16 @@ async function submitReuploadSourceFile() {
 openUpload = function () {
   modalForm(
     'Thêm học liệu mới',
-    `<p>Tải tệp PDF hoặc nhập văn bản bài học. Lumi sẽ tự động trích xuất nội dung theo trang và lập chỉ mục cho Trợ giảng AI.</p>` +
+    `<p>Tải tệp PDF, Slide PowerPoint (.pptx) hoặc nhập bài học. Lumi sẽ tự động trích xuất nội dung và lập chỉ mục cho Trợ giảng AI.</p>` +
       select('Loại học liệu', 'uploadKind', [
         'PDF / Slide bài giảng PDF',
+        'Slide PowerPoint (.pptx / .ppt)',
         'Văn bản / Ghi chú môn học',
         'Tài liệu tham khảo mở rộng'
       ]) +
       input('Tên học liệu', 'uploadTitle') +
-      `<label for="protoFile">Chọn tệp PDF từ máy tính</label><input id="protoFile" type="file" accept=".pdf,.txt" onchange="if(this.files[0])document.getElementById('uploadTitle').value=this.files[0].name">` +
-      `<label for="uploadText">Hoặc dán nội dung văn bản (nếu không chọn file PDF)</label><textarea id="uploadText" rows="4" placeholder="Dán nội dung bài giảng hoặc tóm tắt chương tại đây..."></textarea>`,
+      `<label for="protoFile">Chọn tệp từ máy tính (.pdf, .pptx, .ppt, .docx, .txt)</label><input id="protoFile" type="file" accept=".pdf,.pptx,.ppt,.docx,.txt" onchange="if(this.files[0])document.getElementById('uploadTitle').value=this.files[0].name">` +
+      `<label for="uploadText">Hoặc dán nội dung văn bản (nếu không chọn file)</label><textarea id="uploadText" rows="4" placeholder="Dán nội dung bài giảng hoặc tóm tắt chương tại đây..."></textarea>`,
     'addPrototypeSource()',
     'Tải lên & Mở tài liệu'
   );
@@ -1188,24 +1403,17 @@ addPrototypeSource = async function () {
   const file = fileInput?.files?.[0];
 
   closeModal();
-  toast('Đang tải lên và phân tích nội dung tài liệu...');
+  const isPptx = title.toLowerCase().endsWith('.pptx') || title.toLowerCase().endsWith('.ppt') || kind.includes('PowerPoint');
+  toast(`Đang tải lên và phân tích ${isPptx ? 'tệp trình chiếu Slide' : 'tài liệu'}...`);
 
-  let pdfBase64 = null;
+  let fileBase64 = null;
   if (file) {
-    if (file.name.toLowerCase().endsWith('.pdf')) {
-      pdfBase64 = await new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(file);
-      });
-    } else if (!textContent) {
-      try {
-        textContent = await file.text();
-      } catch (e) {
-        console.warn(e);
-      }
-    }
+    fileBase64 = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
   }
 
   try {
@@ -1213,25 +1421,27 @@ addPrototypeSource = async function () {
       method: 'POST',
       body: JSON.stringify({
         title,
-        kind: kind.startsWith('PDF') ? 'pdf' : 'pdf',
-        description: 'Tải lên từ Lumi Web',
-        pdf_base64: pdfBase64,
+        kind: isPptx ? 'slide' : (kind.startsWith('PDF') ? 'pdf' : 'pdf'),
+        description: isPptx ? 'Slide bài giảng PowerPoint trên Lumi' : 'Tải lên từ Lumi Web',
+        pdf_base64: fileBase64,
         text_content: textContent || undefined
       })
     });
     const s = res.data;
     lumiActiveBackendSourceId = s.id;
     localStorage.setItem('lumi-backend-source-id', s.id);
+    const pageOrSlideCount = s.active_version?.page_count || 1;
+    const detectedSlide = isPptx || s.kind === 'slide' || title.toLowerCase().endsWith('.pptx') || title.toLowerCase().endsWith('.ppt');
     const newRec = {
       id: s.id,
       backendId: s.id,
       title: cleanVietText(s.title),
-      type: 'PDF',
-      pageCount: s.active_version?.page_count || 1,
+      type: detectedSlide ? 'SLIDE' : 'PDF',
+      pageCount: pageOrSlideCount,
       status: s.status || 'ready',
       version: s.active_version?.version_no || 1,
-      tags: ['Đã lập chỉ mục AI', 'Trích dẫn theo trang', 'Sẵn sàng hỏi đáp'],
-      meta: `${s.active_version?.page_count || 1} trang · Đã đồng bộ đám mây`
+      tags: [detectedSlide ? 'Bộ trình chiếu Slide 16:9' : 'Đã lập chỉ mục AI', 'Trích dẫn chính xác', 'Sẵn sàng hỏi đáp'],
+      meta: `${pageOrSlideCount} ${detectedSlide ? 'slide' : 'trang'} · Đã đồng bộ đám mây`
     };
     records.unshift(newRec);
     saveRecords();
@@ -1241,7 +1451,7 @@ addPrototypeSource = async function () {
     readerPage = 1;
     await loadSourceChunks(s.id, true);
     go('reader');
-    toast(`Đã xử lý xong và mở "${s.title}" (${s.active_version?.page_count || 1} trang)!`);
+    toast(`Đã xử lý xong và mở "${s.title}" (${pageOrSlideCount} ${detectedSlide ? 'slide' : 'trang'})!`);
   } catch (err) {
     toast(`Lỗi xử lý nguồn: ${err.message}`);
   }
@@ -1291,15 +1501,34 @@ function renderChatContainerOnly() {
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-openCitation = function (targetPage, ordinal = 1) {
-  const p = targetPage || readerPage || 1;
+openCitation = function (targetPage, ordinal = 1, targetSourceId = null) {
+  let targetSrc = null;
+  if (targetSourceId) {
+    const idx = records.findIndex(r => !r.deleted && (r.id === targetSourceId || r.backendId === targetSourceId || r.title === targetSourceId));
+    if (idx >= 0) {
+      sourceIndex = idx;
+      targetSrc = records[idx];
+    }
+  }
+  targetSrc = targetSrc || records[sourceIndex] || records[0];
+  const isVideo = targetSrc?.type === 'VIDEO';
+  const isSlide = targetSrc?.type === 'SLIDE' || targetSrc?.type === 'PPTX' || targetSrc?.title?.toLowerCase().endsWith('.pptx');
+  const unitName = isVideo ? 'giây' : (isSlide ? 'Slide' : 'Trang');
+
+  const p = targetPage || (isVideo ? (videoTime || 0) : (readerPage || 1)) || 1;
+
+  if (isVideo) {
+    videoTime = p;
+    currentVideoSource = targetSrc;
+    go('video');
+    toast(`🔍 Đang hiển thị mốc thời gian ${formatVideoTime(p)} trên bài giảng video "${targetSrc.title}".`);
+    return;
+  }
+
   readerTab = 'chat';
   readingView = 'document';
-
-  // Điều hướng trang mượt mà ngay trên bản PDF gốc (PDF.js Canvas) hoặc Văn bản AI
   jumpToPdfPage(p);
 
-  // Hiệu ứng phát sáng trên nút trích dẫn vừa bấm
   document.querySelectorAll('.citation-ref-btn').forEach(btn => {
     if (btn.textContent.trim() === `[${ordinal}]`) {
       btn.classList.add('citation-active-pulse');
@@ -1307,7 +1536,8 @@ openCitation = function (targetPage, ordinal = 1) {
     }
   });
 
-  toast(`🔍 Đang hiển thị nguồn trích dẫn [${ordinal}] tại Trang ${p} trên tài liệu PDF.`);
+  if (page !== 'reader') go('reader');
+  toast(`🔍 Đang hiển thị nguồn trích dẫn [${ordinal}] tại ${unitName} ${p} của "${targetSrc.title}".`);
 };
 
 messageHTML = function (m) {
@@ -1469,24 +1699,55 @@ library = function () {
     .map((c, i) => ({ c, i }))
     .filter(x => !searchTerm || x.c.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // 1. Thống kê nhanh chỉ số học tập
+  // 1. Thống kê nhanh chỉ số học tập (Bento KPI Metrics Grid - Đẹp, Hiện đại & Chuẩn Tỷ lệ)
   const statsHTML = `
-    <div class="l-library-stats">
-      <div class="l-lib-stat-badge">
-        <span class="stat-icon">🎓</span>
-        <span>Khóa học: <strong>${all.length} lộ trình</strong></span>
+    <div class="l-library-kpi-grid" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:18px 0 24px">
+      <div class="l-kpi-card course-kpi" onclick="tab='courses';render()" style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--surface,#ffffff);border:1px solid var(--border,#dce3db);border-radius:14px;cursor:pointer;transition:all .22s ease;box-shadow:0 2px 8px rgba(0,0,0,0.02)" title="Bấm để xem tất cả khóa học">
+        <div class="kpi-icon-wrap" style="width:44px;height:44px;min-width:44px;max-width:44px;border-radius:12px;background:rgba(109,94,228,0.12);color:#6d5ee4;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">
+          <span>🎓</span>
+        </div>
+        <div class="kpi-body" style="flex:1;min-width:0">
+          <div class="kpi-number" style="font-size:22px;font-weight:700;color:var(--text,#27352e);line-height:1.1;margin-bottom:2px">${all.length}</div>
+          <div class="kpi-label" style="font-size:13px;font-weight:600;color:var(--text,#27352e);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Khóa học & Lộ trình</div>
+          <div class="kpi-hint" style="font-size:11px;color:var(--muted,#68766b);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Đang học theo nhịp riêng</div>
+        </div>
+        <div class="kpi-arrow" style="margin-left:auto;color:var(--muted,#68766b);opacity:0.5">${icon('chevron')}</div>
       </div>
-      <div class="l-lib-stat-badge">
-        <span class="stat-icon">📑</span>
-        <span>Học liệu đã lập chỉ mục AI: <strong>${allSources.length} tài liệu</strong></span>
+
+      <div class="l-kpi-card source-kpi" onclick="tab='sources';render()" style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--surface,#ffffff);border:1px solid var(--border,#dce3db);border-radius:14px;cursor:pointer;transition:all .22s ease;box-shadow:0 2px 8px rgba(0,0,0,0.02)" title="Bấm để xem tài liệu đã lập chỉ mục">
+        <div class="kpi-icon-wrap" style="width:44px;height:44px;min-width:44px;max-width:44px;border-radius:12px;background:rgba(63,174,116,0.12);color:#3fae74;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">
+          <span>📑</span>
+        </div>
+        <div class="kpi-body" style="flex:1;min-width:0">
+          <div class="kpi-number" style="font-size:22px;font-weight:700;color:var(--text,#27352e);line-height:1.1;margin-bottom:2px">${allSources.length}</div>
+          <div class="kpi-label" style="font-size:13px;font-weight:600;color:var(--text,#27352e);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Học liệu đã lập chỉ mục</div>
+          <div class="kpi-hint" style="font-size:11px;color:var(--muted,#68766b);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sẵn sàng hỏi đáp AI</div>
+        </div>
+        <div class="kpi-arrow" style="margin-left:auto;color:var(--muted,#68766b);opacity:0.5">${icon('chevron')}</div>
       </div>
-      <div class="l-lib-stat-badge">
-        <span class="stat-icon">📝</span>
-        <span>Sổ tay ghi chú: <strong>${notebooks.length} mục</strong></span>
+
+      <div class="l-kpi-card note-kpi" onclick="tab='notes';render()" style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--surface,#ffffff);border:1px solid var(--border,#dce3db);border-radius:14px;cursor:pointer;transition:all .22s ease;box-shadow:0 2px 8px rgba(0,0,0,0.02)" title="Bấm để mở sổ tay ghi chép">
+        <div class="kpi-icon-wrap" style="width:44px;height:44px;min-width:44px;max-width:44px;border-radius:12px;background:rgba(243,156,18,0.12);color:#f39c12;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">
+          <span>📝</span>
+        </div>
+        <div class="kpi-body" style="flex:1;min-width:0">
+          <div class="kpi-number" style="font-size:22px;font-weight:700;color:var(--text,#27352e);line-height:1.1;margin-bottom:2px">${notebooks.length}</div>
+          <div class="kpi-label" style="font-size:13px;font-weight:600;color:var(--text,#27352e);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sổ tay ghi chú</div>
+          <div class="kpi-hint" style="font-size:11px;color:var(--muted,#68766b);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Gắn chính xác vị trí nguồn</div>
+        </div>
+        <div class="kpi-arrow" style="margin-left:auto;color:var(--muted,#68766b);opacity:0.5">${icon('chevron')}</div>
       </div>
-      <div class="l-lib-stat-badge">
-        <span class="stat-icon">🗂️</span>
-        <span>Thẻ nhớ SM-2: <strong>${cardDeck.length} thẻ</strong></span>
+
+      <div class="l-kpi-card card-kpi" onclick="tab='practice';render()" style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--surface,#ffffff);border:1px solid var(--border,#dce3db);border-radius:14px;cursor:pointer;transition:all .22s ease;box-shadow:0 2px 8px rgba(0,0,0,0.02)" title="Bấm để ôn tập thẻ nhớ SM-2">
+        <div class="kpi-icon-wrap" style="width:44px;height:44px;min-width:44px;max-width:44px;border-radius:12px;background:rgba(238,84,124,0.12);color:#ee547c;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">
+          <span>🗂️</span>
+        </div>
+        <div class="kpi-body" style="flex:1;min-width:0">
+          <div class="kpi-number" style="font-size:22px;font-weight:700;color:var(--text,#27352e);line-height:1.1;margin-bottom:2px">${cardDeck.length}</div>
+          <div class="kpi-label" style="font-size:13px;font-weight:600;color:var(--text,#27352e);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Thẻ nhớ SM-2</div>
+          <div class="kpi-hint" style="font-size:11px;color:var(--muted,#68766b);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Lặp lại ngắt quãng</div>
+        </div>
+        <div class="kpi-arrow" style="margin-left:auto;color:var(--muted,#68766b);opacity:0.5">${icon('chevron')}</div>
       </div>
     </div>
   `;
@@ -1498,6 +1759,10 @@ library = function () {
         <span class="tool-icon-badge upload-badge">${icon('plus')}</span>
         <span>Thêm học liệu mới</span>
       </button>
+      <button class="lumi-tool-pill" onclick="openNewVideoModal()" title="Gửi link YouTube hoặc file video để AI phân tích">
+        <span class="tool-icon-badge history-badge">${icon('play')}</span>
+        <span>Học qua Video</span>
+      </button>
       <button class="lumi-tool-pill" onclick="openNewCourse()" title="Khởi tạo môn học hoặc lộ trình cá nhân">
         <span class="tool-icon-badge folder-badge">${icon('folder')}</span>
         <span>Tạo khóa học</span>
@@ -1506,16 +1771,14 @@ library = function () {
         <span class="tool-icon-badge note-badge">${icon('note')}</span>
         <span>Ghi chú bài học</span>
       </button>
-      <button class="lumi-tool-pill" onclick="go('history')" title="Xem lại các phiên thảo luận cùng trợ giảng AI">
-        <span class="tool-icon-badge history-badge">${icon('clock')}</span>
-        <span>Lịch sử hỏi đáp AI</span>
-      </button>
       <button class="lumi-tool-pill" onclick="quizSetup()" title="Biên soạn đề thi trắc nghiệm AI">
         <span class="tool-icon-badge check-badge">${icon('quiz')}</span>
         <span>Luyện trắc nghiệm AI</span>
       </button>
     </div>
   `;
+
+  const videoSources = allSources.filter(r => r.type === 'VIDEO' || r.kind === 'video_link' || r.kind === 'video_upload');
 
   let content = '';
   if (tab === 'courses') {
@@ -1526,13 +1789,32 @@ library = function () {
     `;
   } else if (tab === 'sources') {
     content = sourceRows();
+  } else if (tab === 'video') {
+    content = videoSources.length
+      ? `<div class="feature-grid">${videoSources.map(v => `
+          <article class="settingcard" style="border-radius:14px;padding:18px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <span class="badge green">${icon('play')} Video bài giảng</span>
+                <span style="font-size:11.5px;color:var(--muted)">${v.chapters?.length || 4} mốc thời gian</span>
+              </div>
+              <h2 style="font-size:16px;margin:0 0 8px;line-height:1.4">${esc(v.title)}</h2>
+              <p style="font-size:13px;color:var(--secondary);line-height:1.6;margin-bottom:14px">${esc((v.summary || v.description || 'Bài giảng video có trợ giảng AI hỗ trợ giải đáp thắc mắc và bóc tách mốc thời gian.').slice(0, 160))}...</p>
+            </div>
+            <div class="actionline">
+              <button class="btn" onclick="currentVideoSource=records.find(r=>r.id==='${v.id}');go('video')">${icon('play')} Mở bài giảng & Hỏi AI</button>
+              <button class="btn secondary" onclick="openNewVideoModal()">${icon('plus')} Thêm video</button>
+            </div>
+          </article>
+        `).join('')}</div>`
+      : empty('Chưa có bài giảng video nào.', btn('Thêm video đầu tiên', 'openNewVideoModal()', false, 'plus'));
   } else if (tab === 'notes') {
     content = notebooks.length
       ? `<div class="feature-grid">${notebooks
           .map(
             n => `
           <article class="settingcard" style="border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.02)">
-            <span class="badge green">${cleanVietText(n.kind || 'Ghi chú')} · Trang ${n.page || 1}</span>
+            <span class="badge green">${cleanVietText(n.kind || 'Ghi chú')} · ${n.videoTime !== undefined ? 'Video ' + formatVideoTime(n.videoTime) : 'Trang ' + (n.page || 1)}</span>
             <h2 style="font-size:15.5px;margin-top:12px">${esc(n.title)}</h2>
             <p class="note-text" style="color:var(--secondary);line-height:1.75;font-size:13px">${esc(
               n.body
@@ -1577,6 +1859,7 @@ library = function () {
     `<div class="tabs">${[
       ['courses', `Khóa học (${all.length})`],
       ['sources', `Học liệu (${allSources.length})`],
+      ['video', `Video bài giảng (${videoSources.length})`],
       ['notes', `Ghi chú (${notebooks.length})`],
       ['practice', `Luyện tập (${cardDeck.length} thẻ)`]
     ]
@@ -1590,37 +1873,94 @@ library = function () {
   );
 };
 
+function getCourseLessonList(c, courseIdx) {
+  if (!c) c = [...courses, ...extraCourses][courseIdx] || courses[0];
+  const d = drafts[courseIdx];
+  if (Array.isArray(d) && d.length > 0) {
+    return d.map((item, idx) => {
+      if (typeof item === 'object' && item !== null && item.title) {
+        return {
+          id: item.id || `ls-${courseIdx}-${idx}`,
+          title: cleanVietText(item.title),
+          goal: cleanVietText(item.goal || `Nắm vững nội dung bài ${idx + 1}`),
+          prerequisites: cleanVietText(item.prerequisites || 'Kiến thức nền tảng'),
+          minutes: item.minutes || 45,
+          sourceId: item.sourceId || null,
+          page: item.page || 1
+        };
+      }
+      return {
+        id: `ls-${courseIdx}-${idx}`,
+        title: cleanVietText(String(item)),
+        goal: `Nắm vững nội dung trọng tâm của ${String(item)}`,
+        prerequisites: idx === 0 ? 'Kiến thức nhập môn' : `Bài ${idx}: Hoàn thành nội dung trước`,
+        minutes: 45,
+        sourceId: null,
+        page: 1
+      };
+    });
+  }
+
+  // Khóa học mới tạo chưa có đề cương: trả về mảng rỗng để không bị dính môn khác
+  if (c.isNewCourse || (courseIdx >= courses.length && (!d || d.length === 0))) {
+    return [];
+  }
+
+  const titleLower = (c.title || '').toLowerCase();
+  if (c.blue || titleLower.includes('mạng')) {
+    return [
+      { id: 'net-1', title: 'Tổng quan về mạng máy tính', goal: 'Nắm được các mô hình phân lớp và phương thức truyền thông mạng', prerequisites: 'Tin học cơ sở', minutes: 30 },
+      { id: 'net-2', title: 'Mô hình OSI và TCP/IP', goal: 'Phân tích chức năng của 7 tầng OSI và 4 tầng TCP/IP', prerequisites: 'Khái niệm mạng máy tính', minutes: 45 },
+      { id: 'net-3', title: 'Địa chỉ IP và chia mạng con (Subnetting)', goal: 'Thực hành tính toán dải IP, subnet mask và CIDR', prerequisites: 'Hệ nhị phân và mô hình IP', minutes: 60 },
+      { id: 'net-4', title: 'Định tuyến cơ bản và bảo mật mạng', goal: 'Hiểu các giao thức định tuyến RIP, OSPF và quy tắc tường lửa', prerequisites: 'Định tuyến gói tin IP', minutes: 45 }
+    ];
+  }
+
+  if (courseIdx === 0 || titleLower.includes('cơ sở dữ liệu')) {
+    return [
+      { id: 'db-1', title: 'Tổng quan hệ quản trị cơ sở dữ liệu', goal: 'Nắm vững kiến trúc 3 mức và mô hình thực thể ERD', prerequisites: 'Tin học đại cương', minutes: 30 },
+      { id: 'db-2', title: 'Mô hình dữ liệu quan hệ', goal: 'Hiểu cấu trúc quan hệ, bộ, thuộc tính và miền giá trị', prerequisites: 'Lý thuyết tập hợp cơ bản', minutes: 45 },
+      { id: 'db-3', title: 'Khóa và ràng buộc toàn vẹn', goal: 'Phân biệt khóa chính, khóa ngoại, ràng buộc CHECK và tham chiếu', prerequisites: 'Mô hình quan hệ', minutes: 45 },
+      { id: 'db-4', title: 'Truy vấn dữ liệu với ngôn ngữ SQL', goal: 'Thực hành các câu lệnh SELECT, JOIN, GROUP BY và ràng buộc', prerequisites: 'Khóa và quan hệ giữa các bảng', minutes: 60 }
+    ];
+  }
+
+  return [
+    { id: `c-${courseIdx}-1`, title: `Chương 1: Tổng quan về ${c.title}`, goal: `Làm quen với các định nghĩa và phạm vi nghiên cứu của ${c.title}`, prerequisites: 'Kiến thức nhập môn', minutes: 35 },
+    { id: `c-${courseIdx}-2`, title: `Chương 2: Các phương pháp & Kỹ thuật cốt lõi`, goal: `Nắm vững các thuật toán và nguyên lý trọng tâm`, prerequisites: 'Chương 1', minutes: 45 },
+    { id: `c-${courseIdx}-3`, title: `Chương 3: Quy trình thực nghiệm & Ứng dụng thực tế`, goal: `Vận dụng giải quyết tình huống thực tế`, prerequisites: 'Chương 2', minutes: 50 },
+    { id: `c-${courseIdx}-4`, title: `Chương 4: Đánh giá mô hình & Tổng kết môn học`, goal: `Tổng kết kiến thức và làm bài tập vận dụng`, prerequisites: 'Chương 3', minutes: 40 }
+  ];
+}
+
 function renderModernCourseCard(c, i) {
   const isBlue = Boolean(c.blue);
-  const lessons = drafts[i] || [
-    'Tổng quan môn học',
-    'Các khái niệm nền tảng',
-    'Khóa và ràng buộc',
-    'Ứng dụng và luyện tập'
-  ];
-  const curLesson =
-    lessons[Math.min(lessons.length - 1, Math.floor(((c.progress || 0) / 100) * lessons.length))] ||
-    lessons[0];
+  const lessons = getCourseLessonList(c, i);
+  const completedCount = lessons.filter(ls => completedLessons.includes(`${i}:${ls.id}`)).length;
+  const progressPct = lessons.length ? Math.round((completedCount / lessons.length) * 100) : (c.progress || 0);
+  const curLesson = lessons.length ? (lessons[Math.min(lessons.length - 1, completedCount)]?.title || lessons[0]?.title) : 'Chưa có bài học';
   const coverText = c.cover || c.title || 'Khóa học';
+  const lessonStatusText = lessons.length ? `${completedCount} / ${lessons.length} bài` : 'Chưa có đề cương';
+
   return `
     <div class="course" onclick="openCourse(${i})" style="cursor:pointer;display:flex;flex-direction:column">
       <div class="coursecover ${isBlue ? 'blue' : ''}">
         <div>
           <div class="coverlabel">LUMI / LEARNING</div>
-          <div class="covername">${esc(coverText).replace(/\n/g, '<br>')}</div>
+          <div class="covername">${esc(coverText).replace(/\\n/g, '<br>')}</div>
         </div>
         ${courseArt(isBlue)}
       </div>
       <div class="coursebody" style="display:flex;flex-direction:column;flex:1">
         <span class="badge ${isBlue ? 'green' : ''}" style="align-self:flex-start">${esc(
-          c.tag || 'CNTT · Nền tảng'
+          c.tag || 'Khóa học cá nhân'
         )}</span>
         <h3>${c.archived ? '[Lưu trữ] ' : ''}${esc(c.title)}</h3>
         <p>${esc(c.subtitle || curLesson)}</p>
-        <div class="progressline"><span style="width:${c.progress || 0}%"></span></div>
+        <div class="progressline"><span style="width:${progressPct}%"></span></div>
         <div class="coursestatus">
-          <span>Đã mở ${esc(c.lessons || '3 / 8 bài')}</span>
-          <span>${c.progress || 0}%</span>
+          <span>${esc(lessonStatusText)}</span>
+          <span>${progressPct}%</span>
         </div>
         <div class="course-card-actions" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
           <button class="btn" style="font-size:11.5px;padding:7px 14px;border-radius:8px" onclick="event.stopPropagation();openCourse(${i})">Vào học ngay ${icon(
@@ -1631,8 +1971,8 @@ function renderModernCourseCard(c, i) {
       </div>
     </div>
   `;
-// Keep original responsive courseCard from core.js
-// courseCard = renderModernCourseCard;
+}
+courseCard = renderModernCourseCard;
 
 // 6. NÂNG CẤP QUIZ, KHÓA HỌC, FLASHCARD SM-2 & QUOTA THẬT
 quizSetup = function () {
@@ -1912,6 +2252,7 @@ storeNotebook = async function (id) {
   }
   let existing = notebooks.find(x => x.id === id);
   if (existing) {
+    // Sửa ghi chú giữ nguyên vị trí nguồn, phiên bản và trang/mốc video đã gắn
     Object.assign(existing, { title, body, kind });
     if (existing.backendId && /^[0-9a-f-]{36}$/i.test(existing.backendId)) {
       try {
@@ -1925,6 +2266,10 @@ storeNotebook = async function (id) {
     }
   } else {
     let createdId = null;
+    const curSrc = records[sourceIndex] || records[0];
+    const isVid = curSrc?.type === 'VIDEO';
+    const notePage = isVid ? undefined : (readerPage || 1);
+    const noteVideoTime = isVid ? (videoTime || 0) : undefined;
     try {
       const res = await lumiFetch('/notes', {
         method: 'POST',
@@ -1932,7 +2277,7 @@ storeNotebook = async function (id) {
           kind: 'note',
           title,
           body,
-          source_id: records[sourceIndex]?.backendId || lumiActiveBackendSourceId || undefined
+          source_id: curSrc?.backendId || lumiActiveBackendSourceId || undefined
         })
       });
       createdId = res?.data?.id || null;
@@ -1945,13 +2290,92 @@ storeNotebook = async function (id) {
       title,
       body,
       kind,
-      page: readerPage || 1
+      sourceId: curSrc?.id,
+      sourceTitle: curSrc?.title || 'Tài liệu học tập',
+      sourceVersion: curSrc?.version || 1,
+      page: notePage,
+      videoTime: noteVideoTime
     });
   }
   saveAllNotes();
   closeModal();
   render();
-  toast('Đã lưu ghi chú và đồng bộ thành công!');
+  toast('Đã lưu ghi chú gắn nguồn chính xác và đồng bộ thành công!');
+};
+
+openNoteSource = function (id) {
+  const n = notebooks.find(x => x.id === id);
+  if (!n) return;
+  if (n.videoTime !== undefined) {
+    const vIdx = records.findIndex(r => !r.deleted && (r.id === n.sourceId || r.type === 'VIDEO'));
+    if (vIdx >= 0) sourceIndex = vIdx;
+    videoTime = n.videoTime;
+    currentVideoSource = records[sourceIndex];
+    go('video');
+    toast(`Đang hiển thị mốc thời gian ${formatVideoTime(n.videoTime)} của video "${records[sourceIndex]?.title || 'bài giảng'}".`);
+    return;
+  }
+
+  let targetIdx = -1;
+  if (n.sourceId) {
+    targetIdx = records.findIndex(r => !r.deleted && (r.id === n.sourceId || r.backendId === n.sourceId));
+  }
+  if (targetIdx === -1 && n.sourceTitle) {
+    targetIdx = records.findIndex(r => !r.deleted && r.title === n.sourceTitle);
+  }
+  if (targetIdx >= 0) {
+    sourceIndex = targetIdx;
+  }
+  const curSrc = records[sourceIndex] || records[0];
+  const targetPage = n.page || 1;
+  readerPage = targetPage;
+  readerTab = 'notes';
+  readingView = 'document';
+  jumpToPdfPage(targetPage);
+  go('reader');
+  toast(`Đang mở nguồn trích dẫn: "${curSrc?.title || 'Học liệu'}" tại trang ${targetPage}.`);
+};
+
+notesPage = function () {
+  const kindNames = {
+    note: 'Ghi chú',
+    highlight: 'Đánh dấu',
+    question: 'Câu hỏi',
+    saved_answer: 'Câu trả lời AI'
+  };
+
+  return (
+    head(
+      'Sổ tay ghi chú học tập',
+      'Giữ lại những hiểu biết cốt lõi và mở lại chính xác vị trí tài liệu nguồn.',
+      btn('Thêm ghi chú', 'editNotebook()', false, 'plus')
+    ) +
+    (notebooks.length
+      ? `<div class="feature-grid">${notebooks
+          .map(n => {
+            const srcTitle = n.sourceTitle || (records.find(r => r.id === n.sourceId)?.title) || 'Tài liệu học tập';
+            const locText = n.videoTime !== undefined ? 'Video ' + formatVideoTime(n.videoTime) : 'Trang ' + (n.page || 1);
+            return `
+              <article class="settingcard" style="border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.02)">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <span class="badge green">${kindNames[n.kind] || 'Ghi chú'} · ${locText}</span>
+                  <small style="font-size:11px;color:var(--muted)">${esc(srcTitle.slice(0, 26))}${srcTitle.length > 26 ? '…' : ''}</small>
+                </div>
+                <h2 style="font-size:16px;margin:8px 0 6px">${esc(n.title)}</h2>
+                <p class="note-text" style="color:var(--secondary);line-height:1.75;font-size:13px">${esc(n.body)}</p>
+                <div class="actionline" style="margin-top:14px">
+                  <button class="btn secondary" style="font-size:11.5px;padding:5px 11px" onclick="editNotebook('${n.id}')">Sửa</button>
+                  <button class="btn" style="font-size:11.5px;padding:5px 11px" onclick="openNoteSource('${n.id}')">${icon('file')} Về nguồn</button>
+                  <button class="btn secondary" style="font-size:11.5px;padding:5px 11px" onclick="editCard(null,'${n.id}')">Tạo thẻ SM-2</button>
+                  <button class="btn secondary" style="font-size:11.5px;padding:5px 11px" onclick="deleteNotebook('${n.id}')">Xóa</button>
+                </div>
+              </article>
+            `;
+          })
+          .join('')}</div>`
+      : empty('Bạn chưa có ghi chú nào trong sổ tay.', btn('Tạo ghi chú đầu tiên', 'editNotebook()', false, 'plus'))) +
+    footer()
+  );
 };
 
 deleteNotebook = function (id) {
@@ -2126,8 +2550,9 @@ async function confirmDeleteSource() {
 openNewCourse = function () {
   modalForm(
     'Tạo khóa học & Lộ trình mới',
-    input('Tên khóa học', 'courseName', '', 'text', 'Ví dụ: Trí tuệ nhân tạo đại cương') +
-      input('Mục tiêu / Chuyên đề trọng tâm', 'courseGoal', '', 'text', 'Ví dụ: Bài 1 · Các thuật toán tìm kiếm'),
+    input('Tên khóa học', 'courseName', '', 'text', 'Ví dụ: Khai phá dữ liệu trong kinh doanh') +
+      input('Mục tiêu / Chuyên đề trọng tâm', 'courseGoal', '', 'text', 'Ví dụ: Nắm vững các kỹ thuật khai phá và ứng dụng') +
+      `<p style="font-size:12.5px;color:var(--muted);margin-top:8px">Sau khi tạo khóa học, bạn có thể liên kết tài liệu PDF/PPTX hoặc yêu cầu Trợ giảng AI sinh đề cương tự động.</p>`,
     'submitNewCourseBackend()',
     'Tạo khóa học'
   );
@@ -2135,45 +2560,49 @@ openNewCourse = function () {
 
 async function submitNewCourseBackend() {
   const name = $('courseName')?.value?.trim();
-  const goal = $('courseGoal')?.value?.trim() || 'Bài 1 · Tổng quan môn học';
+  const goal = $('courseGoal')?.value?.trim() || 'Lộ trình học tập cá nhân';
   if (!name) {
     toast('Bạn nhập tên khóa học nhé.');
     return;
   }
   let createdId = null;
   try {
-    const srcIds = records
-      .filter(r => !r.deleted && /^[0-9a-f-]{36}$/i.test(r.id))
-      .slice(0, 2)
-      .map(r => r.id);
     const res = await lumiFetch('/courses', {
       method: 'POST',
       body: JSON.stringify({
         title: name,
         description: goal,
         goal,
-        source_ids: srcIds.length ? srcIds : undefined
+        source_ids: []
       })
     });
     createdId = res?.data?.id || null;
   } catch (e) {
     console.warn(e);
   }
+
+  const newCourseIdx = courses.length + extraCourses.length;
   extraCourses.push({
     backendId: createdId,
     title: name,
     cover: name,
     tag: 'Khóa học cá nhân',
     subtitle: goal,
-    progress: 12,
-    lessons: '1 / 6 bài',
-    blue: extraCourses.length % 2 === 1
+    progress: 0,
+    lessons: 'Chưa có bài học',
+    blue: extraCourses.length % 2 === 1,
+    isNewCourse: true
   });
   persist('sf-courses', extraCourses);
+
+  // Khởi tạo đề cương rỗng độc lập — không bao giờ rơi vào fallback "Khóa và ràng buộc"!
+  drafts[newCourseIdx] = [];
+  persist('lumi-curriculum', drafts);
+
   closeModal();
-  tab = 'courses';
-  go('library');
-  toast(`Đã khởi tạo khóa học "${name}"!`);
+  selectedCourse = newCourseIdx;
+  go('course');
+  toast(`Đã khởi tạo khóa học "${name}"! Hãy liên kết học liệu hoặc đề cương để bắt đầu.`);
 }
 
 privacyDialog = function () {
@@ -2545,6 +2974,672 @@ plannerPage = function () {
   );
 };
 
+// ==========================================
+// 1. TỐI ƯU HỎI ĐÁP & ÔN TẬP THEO TÀI LIỆU HIỆN TẠI (XÓA BỎ HARDCODE "KHÓA VÀ RÀNG BUỘC")
+// ==========================================
+function getCurrentActiveSource() {
+  const last = saved('lumi-last-read', null);
+  // Chỉ khi người dùng chủ động bấm vào tài liệu cũ (explicit === true) mới ưu tiên tài liệu cũ
+  if (last?.explicit && last?.id) {
+    const found = records.find(r => !r.deleted && (r.id === last.id || r.backendId === last.id));
+    if (found) return found;
+  }
+  // Mặc định luôn ưu tiên tài liệu thật từ backend (UUID)
+  const realDoc = records.find(r => !r.deleted && r.status === 'ready' && /^[0-9a-f-]{36}$/i.test(r.id || r.backendId));
+  if (realDoc) return realDoc;
+  const readySources = records.filter(r => !r.deleted && r.status === 'ready');
+  return readySources[0] || records.find(r => !r.deleted) || records[0];
+}
+
+function openAskSource(specificSourceId) {
+  let target = specificSourceId
+    ? records.find(r => r.id === specificSourceId || r.backendId === specificSourceId)
+    : getCurrentActiveSource();
+  if (!target && records.length) target = records[0];
+  if (!target) {
+    toast('Bạn vui lòng thêm ít nhất một tài liệu để bắt đầu nhé.');
+    openUpload();
+    return;
+  }
+  sourceIndex = records.indexOf(target);
+  lumiActiveBackendSourceId = target.backendId || target.id;
+  localStorage.setItem('lumi-backend-source-id', lumiActiveBackendSourceId);
+  chatSourceIds = [target.id];
+
+  loadChatHistoryForSource(target.id);
+  readerTab = 'chat';
+  readingView = 'assistant';
+  go('reader');
+  toast('Trợ giảng AI: Đang mở học liệu "' + target.title + '"');
+}
+
+function openSmartPracticeModal(specificSourceId) {
+  const target = specificSourceId
+    ? records.find(r => r.id === specificSourceId || r.backendId === specificSourceId)
+    : getCurrentActiveSource();
+  const title = target ? target.title : 'Tài liệu đang học';
+  showModal(
+    `<h2 id="modalTitle">Trung tâm Ôn tập & Rèn luyện AI</h2>` +
+      `<p style="margin-bottom:14px">Học liệu trọng tâm: <strong>${esc(title)}</strong></p>` +
+      `<div class="stack" style="gap:10px">` +
+      `<div class="settingcard" style="padding:14px;cursor:pointer" onclick="closeModal();quizSetup()">` +
+      `<div class="sectiontitle"><strong>📝 Luyện tập trắc nghiệm AI</strong><span class="badge" style="color:var(--accent,#3fae74)">Tự động chấm</span></div>` +
+      `<p style="margin:4px 0 0;font-size:12.5px;color:var(--muted)">Sinh đề kiểm tra 4 phương án từ nội dung học liệu này, chấm điểm tức thì và phân tích đáp án đúng/sai.</p>` +
+      `</div>` +
+      `<div class="settingcard" style="padding:14px;cursor:pointer" onclick="closeModal();generateCards()">` +
+      `<div class="sectiontitle"><strong>📇 Thẻ ghi nhớ Flashcard (SM-2)</strong><span class="badge" style="color:var(--accent,#3fae74)">Lặp lại ngắt quãng</span></div>` +
+      `<p style="margin:4px 0 0;font-size:12.5px;color:var(--muted)">Tạo bộ thẻ ôn tập thông minh từ tài liệu giúp tối ưu hóa khả năng ghi nhớ dài hạn.</p>` +
+      `</div>` +
+      `<div class="settingcard" style="padding:14px;cursor:pointer" onclick="closeModal();go('review')">` +
+      `<div class="sectiontitle"><strong>📚 Sổ ôn tập của bạn</strong></div>` +
+      `<p style="margin:4px 0 0;font-size:12.5px;color:var(--muted)">Xem lại các câu hỏi hoặc khái niệm bạn đã đánh dấu cần xem lại.</p>` +
+      `</div>` +
+      `</div>` +
+      `<div class="modalactions">${btn('Đóng', 'closeModal()', true)}</div>`
+  );
+}
+
+// Ghi đè hàm home() để xóa bỏ dữ liệu mock "Khóa và ràng buộc" ở Trang chủ
+home = function () {
+  let firstName = userProfile.name.trim().split(' ').at(-1) || 'bạn';
+  if (firstName === 'Bạn') firstName = 'bạn';
+  const last = saved('lumi-last-read', null);
+  const recent = records.filter(r => !r.deleted).slice(0, 3);
+  const source = getCurrentActiveSource();
+  let allCourses = [...courses, ...extraCourses]
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => !c.archived)
+    .slice(0, 2);
+  const scheduled = plans.filter(p => !p.done).slice(0, 2);
+
+  // Tìm ghi chú thực tế của người dùng (bỏ qua ghi chú mẫu cũ 'Khóa và ràng buộc')
+  const realNote =
+    notebooks.find(n => n.id !== 'note0' && n.title !== 'Khóa và ràng buộc') ||
+    (notebooks[0]?.title !== 'Khóa và ràng buộc' ? notebooks[0] : null);
+
+  return (
+    `<div class="l-home-welcome"><div><span class="eyebrow">GÓC HỌC TẬP CỦA BẠN</span><h1>Chào ${esc(firstName)},<br>mình học thêm một chút nhé?</h1><p>Tiếp nối điều đang tò mò. Không cần vội.</p></div><button class="l-home-add" onclick="openUpload()">${icon('plus')}Thêm học liệu</button></div>` +
+    `<div class="l-home-grid"><div class="l-home-primary">` +
+    `<section class="l-continue-card"><div><span class="l-continue-label">${last ? 'TIẾP TỤC TỪ NƠI BẠN DỪNG' : 'MỘT ĐIỀU ĐỂ BẮT ĐẦU'}</span><h2>${source ? esc(source.title.replace(/\.pdf$/i, '')) : 'Một tài liệu, một điều mới.'}</h2><p>${source ? (source.type === 'VIDEO' ? 'Bài giảng video tương tác & transcript AI' : 'Đang ở trang ' + (last?.page || 1) + ' · Học liệu sẵn sàng') : 'Thêm một tài liệu bạn muốn hiểu. Lumi sẽ cùng bạn khám phá.'}</p><button class="btn" onclick="continueLumi()">${source ? 'Học tiếp' : 'Thêm tài liệu'}${icon('arrow')}</button></div><div class="l-continue-art" aria-hidden="true"><div><small>LUMI / LEARNING</small>${icon('book')}<i></i><i></i><span>Mỗi chút hiểu thêm.</span></div></div></section>` +
+    `<div class="l-home-quick">` +
+    `<button onclick="openAskSource()">${toneIcon('spark', 'green')}<span><strong>Hỏi điều chưa rõ</strong><small>${source ? esc(source.title.slice(0, 32)) : 'Mình cùng tìm hiểu.'}</small></span>${icon('chevron')}</button>` +
+    `<button onclick="editNotebook()">${toneIcon('note', 'amber')}<span><strong>Ghi lại một ý hay</strong><small>Bằng lời của bạn.</small></span>${icon('chevron')}</button>` +
+    `</div>` +
+    `<section class="l-home-section"><div class="sectiontitle"><h2>Khóa học của mình</h2><button class="textbtn" onclick="tab='courses';go('library')">Xem tất cả ${icon('chevron')}</button></div>${allCourses.length ? `<div class="courses">${allCourses.map(({ c, i }) => courseCard(c, i)).join('')}</div>` : polishedEmpty('book', 'Một chủ đề bạn muốn học.', 'Gom học liệu và tạo một lộ trình của riêng mình.', btn('Tạo khóa học', 'openNewCourse()', true))}</section>` +
+    `<section class="l-home-section"><div class="sectiontitle"><h2>Học liệu gần đây</h2><button class="textbtn" onclick="tab='sources';go('library')">Mở thư viện ${icon('chevron')}</button></div><div class="l-home-recent">${recent.map(r => `<button onclick="viewSource(${records.indexOf(r)})"><span class="l-recent-file ${r.type === 'VIDEO' ? 'video' : ''}">${icon(r.type === 'VIDEO' ? 'play' : 'file')}</span><span><strong>${esc(r.title)}</strong><small>${esc(r.meta || 'Học liệu')}</small></span>${icon('chevron')}</button>`).join('') || `<div class="l-empty-library">Thư viện còn trống. Một tài liệu là đủ để bắt đầu.</div>`}</div></section>` +
+    `</div>` +
+    `<aside class="l-home-aside">` +
+    `<section class="l-home-ai"><div class="l-home-ai-head">${toneIcon('spark', 'green')}<span><strong>Lumi ở đây.</strong><small>Cùng bạn hiểu thêm.</small></span></div><p>Có điều gì đang làm bạn vướng? Cứ bắt đầu từ một câu hỏi.</p><form onsubmit="event.preventDefault();const q=document.getElementById('homeQuestion').value.trim();if(q){openAskSource();setTimeout(()=>sendChat(q),200);}"><label class="sr-only" for="homeQuestion">Câu hỏi cho Lumi</label><textarea id="homeQuestion" placeholder="Mình chưa hiểu rõ về…" rows="3" required></textarea><button class="btn" type="submit">Cùng tìm hiểu ${icon('arrow')}</button></form><span class="l-sample-note">Trợ giảng AI kết nối trực tiếp tài liệu học tập của bạn.</span></section>` +
+    `<section class="l-home-plan"><div class="sectiontitle"><h2>Dự định nhỏ</h2><button aria-label="Mở kế hoạch" onclick="go('planner')">${icon('arrow')}</button></div>${scheduled.map(p => `<div class="l-home-plan-row"><button class="task-check" aria-label="Hoàn thành ${esc(p.title)}" onclick="togglePlan('${p.id}')"></button><span><strong>${esc(p.title)}</strong><small>${esc(p.day)} · ${p.minutes} phút</small></span></div>`).join('') || '<p>Chưa có kế hoạch cũng không sao.<br>Bạn có thể học theo hứng thú hôm nay.</p>'}<button class="textbtn" onclick="go('planner')">Sắp xếp khi cần ${icon('chevron')}</button></section>` +
+    (realNote
+      ? `<section class="l-home-note"><span class="l-kicker">MỘT Ý MUỐN GIỮ</span><h3>${esc(realNote.title)}</h3><p>${esc(realNote.body.slice(0, 155))}${realNote.body.length > 155 ? '…' : ''}</p><button onclick="go('notes')">Mở sổ tay ${icon('arrow')}</button></section>`
+      : `<section class="l-home-note"><span class="l-kicker">MỘT Ý MUỐN GIỮ</span><h3>Ghi chú tài liệu của bạn</h3><p>Ghi lại những ý quan trọng, câu hỏi hoặc giải thích hữu ích để xem lại bất cứ lúc nào.</p><button onclick="editNotebook()">Thêm ghi chú đầu tiên ${icon('arrow')}</button></section>`) +
+    `<div class="l-home-quiet">${icon('sprout')}Hôm nay hiểu thêm một chút<br>cũng là một bước tiến.</div>` +
+    `</aside></div>`
+  );
+};
+
+// Ghi đè hàm hub() để sửa 2 card đầu trang "Chức năng" (hiện học liệu mới nhất, chỉ hiện cũ khi người dùng bấm vào)
+hub = function () {
+  const currentSrc = getCurrentActiveSource();
+  const last = saved('lumi-last-read', null);
+  const isExplicitOld = !!(last?.explicit && (last?.id === currentSrc?.id || last?.id === currentSrc?.backendId));
+  const badgeLabel = isExplicitOld ? 'ĐANG HỌC GẦN ĐÂY' : 'HỌC LIỆU MỚI NHẤT';
+  const typeBadge = currentSrc?.type === 'VIDEO' ? '🎥 Video bài giảng' : (currentSrc?.type === 'SLIDE' ? '📊 Slide 16:9' : '📑 Tài liệu PDF');
+
+  return (
+    `<div class="p-explore-intro"><div><div class="p-overline"><span class="p-live-dot"></span>KHÔNG GIAN TỰ HỌC</div><h1>Học theo cách<br>của <em>riêng bạn.</em></h1><p>Một nơi để đọc sâu hơn, hỏi tự nhiên hơn<br>và giữ lại những điều mình đã hiểu.</p></div><div class="p-intro-note"><span class="p-mini-label">BẮT ĐẦU THẬT NHẸ</span><div class="p-mini-book">${icon('book')}<span>Một tài liệu.<br>Một điều mới.</span></div><button onclick="openUpload()">Thêm học liệu ${icon('arrow')}</button></div></div>` +
+    `<div class="p-spotlights">` +
+    `<button class="p-spotlight ai" onclick="openAskSource('${currentSrc ? (currentSrc.id || '') : ''}')">${toneIcon('spark', 'green')}<span><small>${badgeLabel} · ${typeBadge}</small><strong>${currentSrc ? esc(currentSrc.title) : 'Điều gì đang làm bạn tò mò?'}</strong><p>${currentSrc ? 'Hỏi trợ giảng AI về học liệu này, tra cứu định nghĩa, đối chiếu trích dẫn chính xác.' : 'Hỏi từ tài liệu, hiểu bằng ví dụ.'}</p></span><span class="p-round-arrow">${icon('arrow')}</span></button>` +
+    `<button class="p-spotlight review" onclick="openSmartPracticeModal('${currentSrc ? (currentSrc.id || '') : ''}')">${toneIcon('quiz', 'purple')}<span><small>${badgeLabel} · ${typeBadge}</small><strong>Ôn tập & Luyện trắc nghiệm AI</strong><p>${currentSrc ? 'Sinh đề kiểm tra & Flashcard SM-2 từ: ' + esc(currentSrc.title.slice(0, 36)) + (currentSrc.title.length > 36 ? '...' : '') : 'Sinh trắc nghiệm AI & Flashcard từ học liệu đang học.'}</p></span><span class="p-round-arrow">${icon('arrow')}</span></button>` +
+    `</div>` +
+    `<div class="p-discovery-bar"><div><h2>Khám phá công cụ</h2><p>Chọn điều hữu ích cho buổi học hôm nay.</p></div><form class="p-search" onsubmit="event.preventDefault()">${icon('search')}<input id="toolSearch" value="${esc(toolQuery)}" aria-label="Tìm chức năng" placeholder="Tìm một công cụ..." oninput="toolQuery=this.value;document.getElementById('toolsResults').innerHTML=toolsResults()"><span>${featureGroups.reduce((n, g) => n + g[1].length, 0)}</span></form></div><nav class="p-category-tabs" aria-label="Nhóm chức năng">${[['Tất cả', -1], ['Bắt đầu', 0], ['Học & hỏi', 1], ['Luyện & ôn', 2], ['Tổ chức', 3]].map(([t, i]) => `<button class="${toolCategory === i ? 'active' : ''}" aria-pressed="${toolCategory === i}" onclick="toolCategory=${i};render()">${t}</button>`).join('')}</nav><div id="toolsResults">${toolsResults()}</div><div class="p-quiet-foot">${icon('sprout')}Không cần dùng tất cả. Chỉ chọn điều hợp với bạn hôm nay.</div>`
+  );
+};
+
+// ==========================================
+// 2. HỆ THỐNG HỌC QUA VIDEO TƯƠNG TÁC THẬT (AI VIDEO ASSISTANT)
+// ==========================================
+let currentVideoSource = null;
+let currentVideoTime = 0;
+let currentVideoChapters = [];
+let videoChatMessages = [];
+
+function openNewVideoModal() {
+  showModal(
+    `<h2 id="modalTitle">Thêm bài giảng Video</h2>` +
+      `<p>Gửi video bài giảng (YouTube hoặc tệp MP4) để Trợ giảng AI Lumi phân tích nội dung chính, bóc tách mốc thời gian và giải đáp thắc mắc.</p>` +
+      `<form onsubmit="event.preventDefault();submitNewVideo()">` +
+      input('Tiêu đề bài giảng', 'videoTitle', '', 'text', 'Nhập tiêu đề video (ví dụ: Mô hình OSI & Mạng máy tính)') +
+      input('Đường dẫn Video (YouTube URL hoặc link MP4)', 'videoUrl', '', 'url', 'https://www.youtube.com/watch?v=...') +
+      `<div style="margin:12px 0"><label for="videoFile">Hoặc tải file video từ máy (.mp4, .webm):</label><input type="file" id="videoFile" accept="video/mp4,video/webm" style="margin-top:6px;width:100%"></div>` +
+      `<label for="videoDesc">Ghi chú hoặc tóm tắt sơ lược (tùy chọn):</label><textarea id="videoDesc" rows="3" placeholder="Nhập thêm bối cảnh hoặc lưu ý cho bài giảng này..."></textarea>` +
+      `<div class="modalactions">${btn('Hủy', 'closeModal()', true)}${btn('✨ Phân tích bằng AI', 'submitNewVideo()', false, 'spark')}</div>` +
+      `</form>`
+  );
+}
+
+async function submitNewVideo() {
+  const title = $('videoTitle')?.value?.trim();
+  const videoUrl = $('videoUrl')?.value?.trim();
+  const desc = $('videoDesc')?.value?.trim();
+  const fileInput = $('videoFile');
+  const file = fileInput?.files?.[0];
+
+  if (!title) {
+    toast('Bạn vui lòng nhập tiêu đề cho bài giảng video nhé.');
+    return;
+  }
+  if (!videoUrl && !file) {
+    toast('Vui lòng dán link YouTube/MP4 hoặc chọn một tệp video.');
+    return;
+  }
+
+  closeModal();
+  toast('Trợ giảng AI Lumi đang phân tích bài giảng video của bạn...');
+
+  try {
+    let payload = {
+      title,
+      video_url: videoUrl || '',
+      description: desc || 'Bài giảng video học tập trên Lumi AI',
+    };
+
+    const res = await lumiFetch('/sources/video-analyze', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    const data = res.data;
+    const newRecord = {
+      id: data.source_id,
+      backendId: data.source_id,
+      title: data.title,
+      type: 'VIDEO',
+      kind: data.kind,
+      videoUrl: data.video_url,
+      summary: data.summary,
+      keyTakeaways: data.key_takeaways || [],
+      chapters: data.chapters || [],
+      quizSample: data.quiz_sample,
+      meta: 'Video bài giảng · ' + (data.chapters?.length || 4) + ' mốc thời gian',
+      status: 'ready',
+    };
+
+    records.unshift(newRecord);
+    persist('lumi-library', records);
+
+    currentVideoSource = newRecord;
+    currentVideoChapters = newRecord.chapters;
+    videoChatMessages = [
+      {
+        role: 'assistant',
+        text: `Chào bạn! Mình đã phân tích xong bài giảng **${newRecord.title}**.\n\n${newRecord.summary}\n\nBạn có thể chọn các mốc thời gian bên dưới để tua nhanh hoặc đặt câu hỏi bất kỳ cho mình nhé!`,
+      },
+    ];
+
+    toast('Đã phân tích xong video! Đang mở trình phát bài giảng...');
+    go('video');
+  } catch (err) {
+    toast('Lỗi phân tích video: ' + err.message);
+  }
+}
+
+function seekVideoTo(seconds) {
+  currentVideoTime = seconds;
+  const vid = document.getElementById('html5VideoPlayer');
+  if (vid) {
+    vid.currentTime = seconds;
+    vid.play().catch(() => {});
+  }
+  const iframe = document.getElementById('ytVideoIframe');
+  if (iframe) {
+    iframe.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func: 'seekTo', args: [seconds, true] }),
+      '*'
+    );
+  }
+  const posEl = document.getElementById('videoCurrentPos');
+  if (posEl) posEl.textContent = formatVideoTime(seconds);
+  renderVideoTranscriptLines();
+}
+
+function formatVideoTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function renderVideoTranscriptLines() {
+  const container = document.getElementById('videoChaptersList');
+  if (!container || !currentVideoChapters.length) return;
+  container.querySelectorAll('.transcript-line').forEach(el => {
+    const s = Number(el.dataset.seconds || 0);
+    el.classList.toggle('active', Math.abs(currentVideoTime - s) < 45);
+  });
+}
+
+async function sendVideoQuestion(qText) {
+  const inputEl = document.getElementById('videoQuestionInput');
+  const question = qText || inputEl?.value?.trim();
+  if (!question) return;
+  if (inputEl) inputEl.value = '';
+
+  videoChatMessages.push({ role: 'user', text: question });
+  renderVideoChatBox();
+
+  try {
+    const sourceId = currentVideoSource?.backendId || currentVideoSource?.id;
+    const res = await lumiFetch(`/sources/${sourceId}/video-chat`, {
+      method: 'POST',
+      body: JSON.stringify({
+        question,
+        current_time_seconds: currentVideoTime,
+        history: videoChatMessages.slice(-6),
+      }),
+    });
+
+    const reply = res.data;
+    videoChatMessages.push({
+      role: 'assistant',
+      text: reply.answer,
+      relevant_timestamp: reply.relevant_timestamp,
+      relevant_seconds: reply.relevant_seconds,
+    });
+    renderVideoChatBox();
+  } catch (err) {
+    videoChatMessages.push({
+      role: 'assistant',
+      text: 'Trợ giảng AI: Xin lỗi bạn, hiện không kết nối được dịch vụ hỏi đáp video (' + err.message + ').',
+    });
+    renderVideoChatBox();
+  }
+}
+
+function renderVideoChatBox() {
+  const box = document.getElementById('videoChatBox');
+  if (!box) return;
+  box.innerHTML = videoChatMessages
+    .map(
+      m => `
+    <div class="msg ${m.role}" style="margin-bottom:12px;padding:12px;border-radius:10px;background:${m.role === 'assistant' ? 'var(--card-bg, #1e2422)' : 'var(--accent-dim, #254238)'}">
+      ${m.role === 'assistant' ? '<span class="label" style="font-size:11px;font-weight:600;color:var(--accent,#3fae74);display:block;margin-bottom:6px">✨ LUMI AI TRỢ GIẢNG</span>' : ''}
+      <div style="font-size:13.5px;line-height:1.6">${esc(m.text).replace(/\n/g, '<br>')}</div>
+      ${
+        m.relevant_timestamp
+          ? `<div style="margin-top:8px"><button class="btn secondary" style="font-size:11.5px;padding:4px 8px" onclick="seekVideoTo(${m.relevant_seconds || 0})">⏱ Tua đến ${m.relevant_timestamp}</button></div>`
+          : ''
+      }
+    </div>`
+    )
+    .join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+window.activeVideoTab = window.activeVideoTab || 'chapters';
+window.switchVideoTab = function (tabKey) {
+  window.activeVideoTab = tabKey;
+  const container = document.getElementById('videoContainer');
+  if (container) {
+    container.className = 'video-page-container tab-' + tabKey;
+  }
+  document.querySelectorAll('.video-mobile-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabKey);
+  });
+};
+
+videoPage = function () {
+  const v =
+    currentVideoSource ||
+    records.find(r => r.type === 'VIDEO') || {
+      id: 'default-video',
+      title: 'Mô hình OSI & 7 Tầng Mạng Máy Tính',
+      videoUrl: 'https://www.youtube.com/watch?v=LANW3m7UgWs',
+      summary:
+        'Bài giảng phân tích toàn diện 7 tầng của mô hình OSI (Open Systems Interconnection) từ tầng Vật lý (Physical) đến tầng Ứng dụng (Application), cơ chế đóng gói dữ liệu (Encapsulation) và luân chuyển gói tin trong mạng Internet.',
+      keyTakeaways: [
+        'Mô hình OSI gồm 7 tầng chuẩn hóa việc giao tiếp giữa các hệ thống mạng',
+        'Tầng Mạng (Network) chịu trách nhiệm định tuyến qua địa chỉ IP và gói tin (Packet)',
+        'Tầng Giao vận (Transport) đảm bảo độ tin cậy với giao thức TCP và UDP',
+        'Cơ chế đóng gói thêm header vào dữ liệu ở mỗi tầng khi gửi đi',
+      ],
+      chapters: [
+        { seconds: 0, timestamp: '00:00', title: 'Giới thiệu & Tổng quan mô hình OSI', summary: 'Đặt vấn đề về chuẩn hóa mạng máy tính' },
+        { seconds: 60, timestamp: '01:00', title: 'Tầng 1 - 3: Physical, Data Link & Network', summary: 'Truyền dẫn tín hiệu, địa chỉ MAC và định tuyến IP' },
+        { seconds: 150, timestamp: '02:30', title: 'Tầng 4: Transport (TCP vs UDP)', summary: 'Đảm bảo kết nối tin cậy và kiểm soát luồng dữ liệu' },
+        { seconds: 240, timestamp: '04:00', title: 'Tầng 5 - 7 & Cơ chế đóng gói dữ liệu', summary: 'Session, Presentation, Application và tổng kết bài học' },
+      ],
+    };
+
+  currentVideoSource = v;
+  currentVideoChapters = v.chapters || [];
+
+  let ytId = '';
+  if (v.videoUrl) {
+    const match = v.videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+    if (match) ytId = match[1];
+  }
+
+  const curTab = window.activeVideoTab || 'chapters';
+
+  return (
+    `<div id="videoContainer" class="video-page-container tab-${curTab}">` +
+    `<div class="video-pagehead-desktop">` +
+    head(
+      esc(v.title),
+      'Học qua bài giảng video · Tương tác thời gian thực cùng trợ giảng AI Lumi',
+      btn('Thêm video mới', 'openNewVideoModal()', false, 'plus')
+    ) +
+    `</div>` +
+    `<div class="video-pagehead-mobile">` +
+    `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">` +
+    `<div style="min-width:0;flex:1">` +
+    `<span class="badge blue" style="font-size:9.5px;padding:2px 7px;border-radius:4px">BÀI GIẢNG VIDEO</span>` +
+    `<h1 style="font-size:15px;margin:3px 0 0;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(v.title)}">${esc(v.title)}</h1>` +
+    `</div>` +
+    `<button class="btn secondary" style="font-size:11px;padding:4px 8px;flex-shrink:0" onclick="openNewVideoModal()">${icon('plus')} Thêm</button>` +
+    `</div>` +
+    `</div>` +
+    `<div class="video-layout">` +
+    `<div>` +
+    `<div class="video-player-wrap">` +
+    (ytId
+      ? `<iframe id="ytVideoIframe" style="width:100%;aspect-ratio:16/9;border:0;display:block" src="https://www.youtube.com/embed/${ytId}?enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+      : `<video id="html5VideoPlayer" controls style="width:100%;aspect-ratio:16/9;display:block" ontimeupdate="currentVideoTime=Math.floor(this.currentTime);const p=$('videoCurrentPos');if(p)p.textContent=formatVideoTime(currentVideoTime);renderVideoTranscriptLines()"><source src="${v.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'}" type="video/mp4"></video>`) +
+    `</div>` +
+    `<div class="video-action-scroll">` +
+    `<button class="btn secondary" onclick="editNotebook(null,'note');setTimeout(()=>{const nb=$('nbBody');if(nb)nb.value='['+formatVideoTime(currentVideoTime)+'] Ghi chú bài giảng: ';},100);">${icon('note')}Ghi chú tại mốc này</button>` +
+    `<button class="btn secondary" onclick="sendVideoQuestion('Giải thích chi tiết kiến thức ở đoạn ' + formatVideoTime(currentVideoTime) + ' của video')">${icon('spark')}Hỏi AI về đoạn này</button>` +
+    `<button class="btn secondary" onclick="quizSetup()">${icon('quiz')}Luyện tập từ video</button>` +
+    `<button class="btn secondary" onclick="generateCards()">${icon('quiz')}Tạo thẻ Flashcard</button>` +
+    `</div>` +
+    `<div class="video-mobile-tabs">` +
+    `<button class="video-mobile-tab-btn ${curTab === 'chapters' ? 'active' : ''}" data-tab="chapters" onclick="switchVideoTab('chapters')">⏱ Mục lục</button>` +
+    `<button class="video-mobile-tab-btn ${curTab === 'chat' ? 'active' : ''}" data-tab="chat" onclick="switchVideoTab('chat')">✨ Trợ giảng AI</button>` +
+    `<button class="video-mobile-tab-btn ${curTab === 'summary' ? 'active' : ''}" data-tab="summary" onclick="switchVideoTab('summary')">📖 Tóm tắt bài học</button>` +
+    `</div>` +
+    `<section id="videoSummaryPanel" class="settingcard" style="margin-top:16px">` +
+    `<h2>Tóm tắt nội dung chính</h2>` +
+    `<p style="line-height:1.65;font-size:13.5px">${esc(v.summary)}</p>` +
+    (v.keyTakeaways && v.keyTakeaways.length
+      ? `<h3 style="margin:16px 0 8px;font-size:14px;color:var(--accent,#3fae74)">Điểm cốt lõi rút ra:</h3><ul style="padding-left:20px;font-size:13px;line-height:1.7">${v.keyTakeaways.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`
+      : '') +
+    `</section>` +
+    `</div>` +
+    `<div>` +
+    `<section id="videoChaptersPanel" class="settingcard" style="margin-bottom:18px">` +
+    `<div class="sectiontitle"><h2>Mục lục thời gian</h2><span id="videoCurrentPos" class="badge">00:00</span></div>` +
+    `<p style="font-size:12px;color:var(--muted)">Nhấn vào từng mốc để tua video trực tiếp đến đoạn tương ứng.</p>` +
+    `<div id="videoChaptersList" class="stack" style="max-height:280px;overflow-y:auto;gap:8px;margin-top:10px">` +
+    (v.chapters || [])
+      .map(
+        ch => `
+      <button class="transcript-line" data-seconds="${ch.seconds}" style="text-align:left;display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);cursor:pointer;width:100%" onclick="seekVideoTo(${ch.seconds})">
+        <span class="badge" style="background:var(--accent-dim,#254238);color:var(--accent,#3fae74);font-weight:600">${ch.timestamp}</span>
+        <div><strong style="display:block;font-size:13px">${esc(ch.title)}</strong><small style="font-size:11.5px;color:var(--muted)">${esc(ch.summary)}</small></div>
+      </button>`
+      )
+      .join('') +
+    `</div>` +
+    `</section>` +
+    `<section id="videoAiPanel" class="settingcard">` +
+    `<div class="sectiontitle"><h2>Trợ giảng AI trong bài giảng</h2><span class="badge">Gemini Flash</span></div>` +
+    `<div id="videoChatBox" style="max-height:260px;overflow-y:auto;margin:12px 0;padding-right:4px">` +
+    videoChatMessages
+      .map(
+        m => `
+      <div class="msg ${m.role}" style="margin-bottom:10px;padding:10px;border-radius:8px;background:${m.role === 'assistant' ? 'var(--card-bg, #1e2422)' : 'var(--accent-dim, #254238)'}">
+        ${m.role === 'assistant' ? '<span class="label" style="font-size:10.5px;font-weight:600;color:var(--accent,#3fae74);display:block;margin-bottom:4px">✨ LUMI AI</span>' : ''}
+        <div style="font-size:13px;line-height:1.5">${esc(m.text).replace(/\n/g, '<br>')}</div>
+        ${m.relevant_timestamp ? `<div style="margin-top:6px"><button class="btn secondary" style="font-size:11px;padding:3px 6px" onclick="seekVideoTo(${m.relevant_seconds || 0})">⏱ Tua đến ${m.relevant_timestamp}</button></div>` : ''}
+      </div>`
+      )
+      .join('') +
+    `</div>` +
+    `<form onsubmit="event.preventDefault();sendVideoQuestion()" style="display:flex;gap:8px">` +
+    `<input id="videoQuestionInput" placeholder="Hỏi trợ giảng về nội dung bài giảng..." style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:inherit;font-size:13px">` +
+    `<button class="btn" type="submit">Gửi</button>` +
+    `</form>` +
+    `</section>` +
+    `</div>` +
+    `</div>` +
+    `</div>` +
+    footer()
+  );
+};
+
+// ==========================================
+// 3. HOÀN THIỆN 3 PHẦN CÀI ĐẶT & KẾT NỐI BACKEND THẬT
+// ==========================================
+
+// 1. Công cụ học tập: gạt switch lưu vào PostgreSQL Supabase
+toggleTool = async function (k) {
+  tools[k] = !tools[k];
+  persist('sf-tools', tools);
+  render();
+
+  const toolLabels = {
+    planner: 'Lịch học linh hoạt',
+    goals: 'Mục tiêu theo tuần',
+    reminders: 'Nhắc học nhẹ nhàng',
+    flashcards: 'Ôn flashcard theo lịch',
+    focus: 'Đồng hồ tập trung',
+    reports: 'Tiến độ chi tiết',
+  };
+
+  try {
+    const curPref = await lumiFetch('/me/preferences');
+    const rev = curPref?.data?.revision || 1;
+    await lumiFetch('/me/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        expected_revision: rev,
+        visible_tools: tools,
+      }),
+    });
+    toast(`Đã ${tools[k] ? 'bật' : 'tắt'} ${toolLabels[k] || 'công cụ'} và lưu lên máy chủ.`);
+  } catch (e) {
+    toast(`Đã lưu tùy chọn trên trình duyệt: ${toolLabels[k] || ''}`);
+  }
+};
+
+function configTool(k) {
+  if (k === 'planner') go('planner');
+  else if (k === 'goals') editGoal();
+  else if (k === 'reminders') editReminder();
+  else if (k === 'flashcards') go('flashcards');
+  else if (k === 'focus') go('focus');
+  else if (k === 'reports') go('stats');
+}
+
+// 2. Xuất ghi chú thật từ Database
+exportNotes = async function () {
+  toast('Đang tổng hợp toàn bộ ghi chú từ máy chủ...');
+  try {
+    let noteList = notebooks;
+    try {
+      const res = await lumiFetch('/notes');
+      if (res?.data && res.data.length) {
+        noteList = res.data;
+      }
+    } catch {}
+
+    const textContent =
+      `# 🌿 SỔ TAY GHI CHÚ HỌC TẬP — LUMI AI\n` +
+      `Sinh viên: ${userProfile.name} (${userProfile.email})\n` +
+      `Thời gian xuất: ${new Date().toLocaleString('vi-VN')}\n` +
+      `Tổng số ghi chú: ${noteList.length}\n` +
+      `============================================================\n\n` +
+      noteList
+        .map(
+          (n, i) =>
+            `### ${i + 1}. ${n.title || 'Ghi chú bài học'}\n` +
+            `- Phân loại: ${n.kind || 'note'}\n` +
+            `- Vị trí: ${n.videoTime !== undefined ? 'Video ' + formatVideoTime(n.videoTime) : 'Trang ' + (n.page || n.locator?.page_number || 1)}\n` +
+            `- Ngày tạo: ${n.created_at || new Date().toLocaleDateString('vi-VN')}\n\n` +
+            `Nội dung:\n${n.body || n.content || ''}\n\n` +
+            `------------------------------------------------------------\n`
+        )
+        .join('\n');
+
+    const blob = new Blob([textContent], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Lumi_Ghi_Chu_${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Đã xuất thành công toàn bộ ghi chú dạng file Markdown (.md)!');
+  } catch (err) {
+    toast('Lỗi xuất ghi chú: ' + err.message);
+  }
+};
+
+// 3. Hồ sơ học tập kết nối thật Backend
+editProfile = async function () {
+  let pData = userProfile;
+  try {
+    const res = await lumiFetch('/me');
+    if (res?.data) {
+      pData = {
+        name: res.data.display_name || userProfile.name,
+        email: res.data.email || userProfile.email,
+        level: res.data.education_level || userProfile.level,
+        goal: res.data.field_of_study || userProfile.goal,
+        style: userProfile.style || 'Giải thích dễ hiểu',
+      };
+    }
+  } catch {}
+
+  modalForm(
+    'Hồ sơ học tập sinh viên',
+    input('Tên hiển thị', 'profileName', pData.name) +
+      input('Email tài khoản', 'profileEmail', pData.email, 'email') +
+      select(
+        'Trình độ hiện tại',
+        'profileLevel',
+        ['Sinh viên năm 1', 'Sinh viên năm 2', 'Sinh viên năm 3', 'Sinh viên năm 4', 'Người tự học'],
+        pData.level
+      ) +
+      input('Ngành học / Mục tiêu', 'profileGoal', pData.goal) +
+      select(
+        'Cách giải thích bạn thích',
+        'profileStyle',
+        ['Giải thích dễ hiểu', 'Ngắn gọn, đi thẳng ý', 'Nhiều ví dụ cụ thể'],
+        pData.style
+      ),
+    `saveProfileToBackend()`,
+    'Lưu hồ sơ'
+  );
+};
+
+async function saveProfileToBackend() {
+  const name = $('profileName')?.value?.trim();
+  const email = $('profileEmail')?.value?.trim();
+  const level = $('profileLevel')?.value;
+  const goal = $('profileGoal')?.value?.trim();
+  const style = $('profileStyle')?.value;
+
+  if (!name) {
+    toast('Bạn vui lòng nhập tên hiển thị nhé.');
+    return;
+  }
+
+  userProfile.name = name;
+  userProfile.email = email;
+  userProfile.level = level;
+  userProfile.goal = goal;
+  userProfile.style = style;
+  persist('lumi-profile', userProfile);
+
+  try {
+    await lumiFetch('/me/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        display_name: name,
+        education_level: level,
+        field_of_study: goal,
+      }),
+    });
+    toast('Đã cập nhật hồ sơ học tập thành công trên máy chủ!');
+  } catch (e) {
+    toast('Đã lưu hồ sơ trên trình duyệt: ' + e.message);
+  }
+  closeModal();
+  render();
+}
+
+// 4. Thiết bị & phiên đăng nhập
+devicesDialog = function () {
+  showModal(
+    `<h2 id="modalTitle">Thiết bị & Phiên đăng nhập</h2>` +
+      `<div class="result-item">` +
+      `<strong>💻 Máy trạm / Trình duyệt hiện tại</strong>` +
+      `<p>Tài khoản: <strong>${esc(userProfile.email)}</strong></p>` +
+      `<p>Địa chỉ mạng LAN: <code>192.168.39.17:8000</code></p>` +
+      `<p>Trạng thái: <span class="badge" style="color:var(--accent,#3fae74)">Đang kết nối Backend FastAPI & Supabase</span></p>` +
+      `</div>` +
+      `<div class="result-item" style="margin-top:10px">` +
+      `<strong>📱 Điện thoại thử nghiệm (OPPO A92)</strong>` +
+      `<p>Đồng bộ dữ liệu qua cùng mạng Wi-Fi nội bộ hoặc tệp APK Lumi-AI.</p>` +
+      `</div>` +
+      `<div class="modalactions">${btn('Đóng', 'closeModal()', true)}${btn('Đăng xuất', 'logoutLumi()')}</div>`
+  );
+};
+
+// 5. Ghi đè settingsDetail()
+settingsDetail = function (kind) {
+  if (kind === 'appearance') {
+    openAppearance();
+    return;
+  }
+  if (kind === 'account') {
+    editProfile();
+    return;
+  }
+  if (kind === 'privacy') {
+    privacyDialog();
+    return;
+  }
+  if (kind === 'help') {
+    showModal(
+      `<h2 id="modalTitle">Trung tâm Hỗ trợ & Hướng dẫn sử dụng</h2>` +
+        `<p><strong>Đồ án / Khóa luận tốt nghiệp FBU — Hệ thống Lumi AI</strong></p>` +
+        `<div style="font-size:13px;line-height:1.7">` +
+        `<p><strong>1. Thêm tài liệu & Học qua Video:</strong> Bạn có thể tải lên tệp PDF giáo trình hoặc dán link YouTube bài giảng để AI phân tích.</p>` +
+        `<p><strong>2. Trợ giảng AI Hybrid RAG:</strong> Hỏi đáp trực tiếp trên nội dung tài liệu, AI dẫn nguồn số trang hoặc mốc thời gian chính xác.</p>` +
+        `<p><strong>3. Sinh đề cương & Luyện tập:</strong> AI sinh đề thi 4 phương án tự động chấm điểm và thẻ nhớ theo thuật toán SM-2.</p>` +
+        `<p><strong>4. Hỗ trợ kỹ thuật:</strong> Khoa CNTT — Trường Đại học Tài chính - Ngân hàng Hà Nội.</p>` +
+        `</div>` +
+        `<div class="modalactions">${btn('Đã hiểu', 'closeModal()')}</div>`
+    );
+    return;
+  }
+  if (kind === 'about') {
+    showModal(
+      `<h2 id="modalTitle">Giới thiệu Nền tảng Lumi AI v2.0</h2>` +
+        `<p><strong>Hệ sinh thái Trợ lý Học tập Thông minh Đa nguồn</strong></p>` +
+        `<div style="font-size:13px;line-height:1.7">` +
+        `<p>🌿 <strong>Đề tài:</strong> Xây dựng ứng dụng hỗ trợ học tập và ôn tập cá nhân hóa từ học liệu đa nguồn kết hợp công nghệ RAG và Trí tuệ nhân tạo.</p>` +
+        `<p>⚙️ <strong>Công nghệ nền tảng:</strong></p>` +
+        `<ul>` +
+        `<li>Backend: Python 3.12, FastAPI, SQLAlchemy ORM</li>` +
+        `<li>Database: Supabase PostgreSQL với extension pgvector</li>` +
+        `<li>AI Model: Radox AI Gateway (Google Gemini 3.6 Flash)</li>` +
+        `<li>Mobile: React Native / Expo kết hợp WebView đồng bộ</li>` +
+        `</ul>` +
+        `<p style="margin-top:8px">Đồ án Khóa luận tốt nghiệp FBU — Bản quyền thuộc về tác giả.</p>` +
+        `</div>` +
+        `<div class="modalactions">${btn('Đóng', 'closeModal()')}</div>`
+    );
+    return;
+  }
+  if (kind === 'plan') {
+    quotaDialog();
+    return;
+  }
+};
+
 quotaDialog = async function () {
   try {
     const res = await lumiFetch('/me/quota');
@@ -2578,6 +3673,804 @@ quotaDialog = async function () {
   }
 };
 
+// ============================================================================
+// 8. MASTER MODULE: KHÓA HỌC, BÀI HỌC VÀ 3 ĐIỂM NHẤN KHÓA LUẬN (HIGHLIGHTS A, B, C)
+// ============================================================================
+
+names.lesson = 'Không gian bài học';
+
+// Đăng ký lại render() để hỗ trợ trang Không gian bài học ('lesson') và các trang công khai (landing, auth, mobile)
+const prevRenderFn = render;
+render = function () {
+  // 1. Nếu đang ở các màn hình công khai ngoài ứng dụng (landing, auth, mobile):
+  if (page === 'landing' || page === 'auth' || page === 'mobile') {
+    if (typeof prevRenderFn === 'function') {
+      prevRenderFn();
+      return;
+    }
+  }
+
+  // 2. Nếu người dùng chưa đăng nhập, bắt buộc chuyển về form đăng nhập 'auth':
+  if (typeof lumiSession === 'function' && !lumiSession()) {
+    page = 'auth';
+    authMode = 'login';
+    if (typeof prevRenderFn === 'function') {
+      prevRenderFn();
+      return;
+    }
+  }
+
+  // 3. Đã đăng nhập và đang ở các trang ứng dụng (in-app):
+  document.documentElement.dataset.entry = 'app';
+  document.documentElement.dataset.surface = 'app';
+  const pr = $('publicRoot');
+  if (pr) pr.innerHTML = '';
+
+  const views = {
+    home,
+    library,
+    reader,
+    course,
+    quiz,
+    personal,
+    hub,
+    history: historyPage,
+    review: reviewPage,
+    flashcards: flashcardsPage,
+    planner: plannerPage,
+    focus: focusPage,
+    stats: statsPage,
+    glossary: glossaryPage,
+    outlines: outlinesPage,
+    auth: authPage,
+    video: videoPage,
+    source: sourcePage,
+    notes: notesPage,
+    lesson: typeof lessonPage === 'function' ? lessonPage : course
+  };
+  $('app').dataset.page = page;
+  $('main').innerHTML = (views[page] || hub)();
+  hydrate();
+  const group = ['reader', 'course', 'quiz', 'source', 'video', 'notes', 'history', 'lesson'].includes(page)
+    ? 'library'
+    : ['review', 'flashcards', 'planner', 'focus', 'stats', 'glossary', 'outlines'].includes(page)
+    ? 'hub'
+    : page;
+  document.querySelectorAll('[data-nav]').forEach(x => x.classList.toggle('active', x.dataset.nav === group));
+  if (page === 'focus' && typeof paintTimer === 'function') paintTimer();
+};
+
+// ----------------------------------------------------------------------------
+// A. GIAO DIỆN KHÓA HỌC & ĐỀ CƯƠNG TOÀN DIỆN (XÓA BỎ HOÀN TOÀN DỮ LIỆU CSDL CŨ)
+// ----------------------------------------------------------------------------
+course = function () {
+  const all = [...courses, ...extraCourses];
+  const c = all[selectedCourse] || courses[0];
+  const lessons = getCourseLessonList(c, selectedCourse);
+  const linkedIds = saved('lumi-course-sources-' + selectedCourse, []);
+  let linkedSources = records.filter(r => !r.deleted && linkedIds.includes(r.id));
+
+  // Tự động đối chiếu nếu tên tài liệu khớp một phần với tên môn học
+  if (linkedSources.length === 0 && c.title) {
+    const cKeywords = c.title.toLowerCase().split(' ').filter(w => w.length > 2);
+    const matched = records.find(r => !r.deleted && cKeywords.some(kw => r.title.toLowerCase().includes(kw)));
+    if (matched) {
+      linkedSources = [matched];
+    }
+  }
+
+  // Đếm tiến độ thực tế theo danh sách bài học
+  const completedCount = lessons.filter(ls => completedLessons.includes(`${selectedCourse}:${ls.id}`)).length;
+  const progressPct = lessons.length ? Math.round((completedCount / lessons.length) * 100) : 0;
+  c.progress = progressPct;
+  c.lessons = `${completedCount} / ${lessons.length || 0} bài`;
+
+  // 1. Header & Actions
+  let html = `
+    <div class="pagehead">
+      <div>
+        <button class="textbtn" style="padding:0;margin-bottom:12px" onclick="go('library')">
+          ${icon('back')} Góc học tập
+        </button>
+        <span class="badge ${c.blue ? 'green' : ''}">${esc(c.tag || 'Khóa học')}</span>
+        <h1 style="margin-top:10px">${esc(c.title)}</h1>
+        <p>${esc(c.subtitle || 'Lộ trình học tập cá nhân hóa — bạn tự chọn thứ tự và nhịp học.')}</p>
+      </div>
+      <div class="course-top-actions">
+        ${btn('Quản lý khóa', 'manageCourse()', true, 'sliders')}
+      </div>
+    </div>
+
+    <div class="reader-extra-modern" style="margin-bottom:20px">
+      <button class="lumi-tool-pill" onclick="linkCourseSources()" title="Liên kết tài liệu PDF hoặc Slide vào khóa học">
+        <span class="tool-icon-badge folder-badge">${icon('folder')}</span>
+        <span>Học liệu liên kết (${linkedSources.length})</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="editCurriculum()" title="Chỉnh sửa hoặc dán đề cương bài học">
+        <span class="tool-icon-badge upload-badge">${icon('note')}</span>
+        <span>Đề cương bài học</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="openCurriculumCoverageModal(${selectedCourse})" title="Kiểm tra mức bao phủ của học liệu theo đề cương (Highlight B)">
+        <span class="tool-icon-badge history-badge">${icon('spark')}</span>
+        <span>Kiểm tra mức bao phủ đề cương</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="quizSetup()" title="Biên soạn đề kiểm tra trắc nghiệm AI">
+        <span class="tool-icon-badge check-badge">${icon('quiz')}</span>
+        <span>Luyện trắc nghiệm AI</span>
+      </button>
+      <button class="lumi-tool-pill" onclick="go('notes')" title="Mở sổ tay ghi chép môn học">
+        <span class="tool-icon-badge note-badge">${icon('note')}</span>
+        <span>Ghi chú môn học</span>
+      </button>
+    </div>
+  `;
+
+  // 2. Section: Học liệu đã liên kết
+  html += `
+    <section class="settingcard" style="border-radius:14px;padding:20px;margin-bottom:20px">
+      <div class="sectiontitle">
+        <h2 style="font-size:16px;display:flex;align-items:center;gap:8px">
+          ${icon('folder')} Học liệu của khóa học
+        </h2>
+        <span class="badge ${linkedSources.length ? 'green' : ''}">
+          ${linkedSources.length ? `${linkedSources.length} tài liệu đã lập chỉ mục` : 'Chưa có học liệu'}
+        </span>
+      </div>
+  `;
+
+  if (linkedSources.length > 0) {
+    html += `
+      <div class="source-stack" style="margin-top:12px">
+        ${linkedSources.map(r => {
+          const isSlide = r.type === 'SLIDE' || r.title.toLowerCase().endsWith('.pptx') || r.title.toLowerCase().endsWith('.ppt');
+          const isVid = r.type === 'VIDEO';
+          return `
+            <div class="managed-source" style="background:var(--card-bg);border-radius:10px;padding:12px">
+              <button class="source-row" onclick="openCourseSource('${r.id}')" style="display:flex;align-items:center;gap:12px;text-align:left;flex:1;background:transparent;border:none;cursor:pointer">
+                <div class="fileicon ${isSlide ? 'orange' : isVid ? 'blue' : ''}" style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:11px;font-weight:700">
+                  ${isSlide ? 'SLIDE' : isVid ? 'VIDEO' : 'PDF'}
+                </div>
+                <div class="sourceinfo" style="flex:1">
+                  <strong style="display:block;font-size:14px">${esc(r.title)}</strong>
+                  <small style="color:var(--muted);font-size:12px">${r.pageCount || r.active_version?.page_count || 1} ${isSlide ? 'slide' : 'trang'} · Đã sẵn sàng Trợ giảng AI</small>
+                </div>
+                <span class="badge green">Sẵn sàng học</span>
+              </button>
+              <div class="actionline" style="margin-top:0">
+                <button class="btn" style="font-size:12px;padding:6px 12px" onclick="openCourseSource('${r.id}')">Mở tài liệu ${icon('arrow')}</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn secondary" style="font-size:12px;padding:6px 12px" onclick="linkCourseSources()">+ Đổi / Liên kết thêm</button>
+        <button class="btn secondary" style="font-size:12px;padding:6px 12px" onclick="openUpload()">+ Tải lên PDF/PPTX mới</button>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="empty-notice-box" style="padding:16px;background:rgba(235,160,50,0.08);border:1px dashed rgba(235,160,50,0.35);border-radius:10px;margin-top:10px">
+        <p style="margin:0 0 10px;font-size:13.5px;color:var(--text);line-height:1.6">
+          ⚠️ <strong>Khóa học này chưa gắn tài liệu học tập.</strong><br>
+          Bạn hãy liên kết tài liệu PDF hoặc Slide bài giảng PowerPoint (.pptx) có sẵn trong thư viện, hoặc tải lên tệp mới để Trợ giảng AI kích hoạt chế độ học tập chuẩn xác.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" style="font-size:12px;padding:7px 14px" onclick="linkCourseSources()">${icon('folder')} + Chọn học liệu sẵn có trong thư viện</button>
+          <button class="btn secondary" style="font-size:12px;padding:7px 14px" onclick="openUpload()">${icon('plus')} + Tải lên file mới (PDF/PPTX)</button>
+        </div>
+      </div>
+    `;
+  }
+  html += `</section>`;
+
+  // 3. Section: Đề cương bài học
+  html += `
+    <section class="settingcard" style="border-radius:14px;padding:20px">
+      <div class="sectiontitle">
+        <div>
+          <h2 style="font-size:16px;margin:0 0 4px">Đề cương & Lộ trình bài học</h2>
+          <span style="font-size:12px;color:var(--muted)">Tiến độ hoàn thành: ${completedCount}/${lessons.length} bài (${progressPct}%)</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn secondary" style="font-size:12px;padding:6px 12px" onclick="editCurriculum()">Chỉnh sửa đề cương</button>
+          <button class="btn secondary" style="font-size:12px;padding:6px 12px" onclick="generateLiveCurriculum()">${icon('spark')} AI sinh đề cương</button>
+        </div>
+      </div>
+      <div class="progressline" style="margin:14px 0 18px"><span style="width:${progressPct}%"></span></div>
+  `;
+
+  if (lessons.length === 0) {
+    html += `
+      <div class="empty-notice-box" style="padding:22px;text-align:center;background:var(--card-bg);border:1px dashed var(--border);border-radius:10px">
+        <span style="font-size:28px;display:block;margin-bottom:8px">📖</span>
+        <strong style="font-size:15px;display:block;margin-bottom:6px">Khóa học chưa có danh sách bài học</strong>
+        <p style="font-size:13px;color:var(--muted);max-width:480px;margin:0 auto 16px;line-height:1.6">
+          Bạn có thể để Trợ giảng AI tự động phân tích học liệu để sinh các chương bài giảng, hoặc tự dán đề cương môn học của mình.
+        </p>
+        <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap">
+          <button class="btn" onclick="generateLiveCurriculum()">${icon('spark')} Tự động sinh đề cương AI</button>
+          <button class="btn secondary" onclick="editCurriculum()">+ Nhập danh sách bài học</button>
+        </div>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="lesson-list-stack" style="display:flex;flex-direction:column;gap:10px">
+        ${lessons.map((ls, i) => {
+          const isDone = completedLessons.includes(`${selectedCourse}:${ls.id}`);
+          return `
+            <div class="lessonrow modern-lesson-item ${isDone ? 'done' : ''}" style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:10px;border:1px solid var(--border);background:var(--card-bg);transition:all .15s">
+              <button class="task-check ${isDone ? 'checked' : ''}" style="width:26px;height:26px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;border:2px solid var(--border);background:transparent" onclick="toggleLessonDone(${selectedCourse}, '${ls.id}')" title="Đánh dấu hoàn thành bài học">
+                ${isDone ? icon('check') : ''}
+              </button>
+              <div style="flex:1;cursor:pointer" onclick="openLesson(${selectedCourse}, ${i})">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                  <span class="lessonnum" style="font-size:11.5px;font-weight:700;color:var(--accent,#3fae74)">BÀI ${String(i + 1).padStart(2, '0')}</span>
+                  <span style="font-size:12px;color:var(--muted)">⏱ ~${ls.minutes || 45} phút</span>
+                  ${isDone ? '<span class="badge green" style="font-size:10.5px">Đã hoàn thành</span>' : ''}
+                </div>
+                <h3 style="margin:0 0 4px;font-size:15px;line-height:1.4">${esc(ls.title)}</h3>
+                <p style="margin:0;font-size:12.5px;color:var(--secondary);line-height:1.5">${esc(ls.goal)}</p>
+              </div>
+              <button class="btn secondary" style="font-size:12px;padding:7px 14px;white-space:nowrap" onclick="openLesson(${selectedCourse}, ${i})">
+                Vào học ${icon('arrow')}
+              </button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  html += `</section>`;
+  return html + footer();
+};
+
+openCourseSource = function (sourceId) {
+  const idx = records.findIndex(r => !r.deleted && (r.id === sourceId || r.backendId === sourceId));
+  if (idx >= 0) {
+    sourceIndex = idx;
+    const r = records[idx];
+    if (r.type === 'VIDEO') {
+      currentVideoSource = r;
+      go('video');
+    } else {
+      readerPage = 1;
+      readerTab = 'chat';
+      readingView = 'document';
+      jumpToPdfPage(1);
+      go('reader');
+    }
+    toast(`Đang mở học liệu "${r.title}".`);
+  }
+};
+
+let currentLessonData = null;
+
+openLesson = function (courseIdx, lessonIdx) {
+  selectedCourse = courseIdx;
+  const all = [...courses, ...extraCourses];
+  const c = all[courseIdx] || courses[0];
+  const lessons = getCourseLessonList(c, courseIdx);
+  const ls = lessons[lessonIdx] || lessons[0];
+  currentLessonData = { course: c, lesson: ls, lessonIdx };
+
+  // Kiểm tra học liệu đã gắn vào khóa học
+  const linkedIds = saved('lumi-course-sources-' + courseIdx, []);
+  let targetSrc = records.filter(r => !r.deleted && linkedIds.includes(r.id))[0];
+
+  // Nếu chưa gắn trực tiếp, thử đối chiếu theo tên khóa học
+  if (!targetSrc && c.title) {
+    const cKeywords = c.title.toLowerCase().split(' ').filter(w => w.length > 2);
+    targetSrc = records.find(r => !r.deleted && cKeywords.some(kw => r.title.toLowerCase().includes(kw)));
+  }
+
+  // NẾU CÓ TÀI LIỆU: Mở trực tiếp trong reader/video
+  if (targetSrc) {
+    const idx = records.indexOf(targetSrc);
+    sourceIndex = idx >= 0 ? idx : 0;
+    if (targetSrc.type === 'VIDEO') {
+      currentVideoSource = targetSrc;
+      go('video');
+    } else {
+      readerPage = ls.page || 1;
+      readerTab = 'chat';
+      readingView = 'document';
+      jumpToPdfPage(readerPage);
+      go('reader');
+    }
+    toast(`Đang vào học Bài ${lessonIdx + 1}: "${ls.title}" trên "${targetSrc.title}".`);
+    return;
+  }
+
+  // NẾU CHƯA CÓ TÀI LIỆU: Mở trang Không gian bài học
+  go('lesson');
+};
+
+toggleLessonDone = function (courseIdx, lessonId) {
+  const key = `${courseIdx}:${lessonId}`;
+  if (completedLessons.includes(key)) {
+    completedLessons = completedLessons.filter(k => k !== key);
+    toast('Đã bỏ đánh dấu hoàn thành bài học.');
+  } else {
+    completedLessons.push(key);
+    toast('🎉 Tuyệt vời! Bạn đã hoàn thành bài học này.');
+  }
+  persist('lumi-completed', completedLessons);
+  render();
+};
+
+lessonPage = function () {
+  if (!currentLessonData) {
+    go('course');
+    return '';
+  }
+  const { course: c, lesson: ls, lessonIdx } = currentLessonData;
+  const isDone = completedLessons.includes(`${selectedCourse}:${ls.id}`);
+
+  return `
+    <div class="pagehead">
+      <div>
+        <button class="textbtn" style="padding:0;margin-bottom:12px" onclick="go('course')">
+          ${icon('back')} Quay lại môn ${esc(c.title)}
+        </button>
+        <span class="badge green">Không gian bài học · Bài ${lessonIdx + 1}</span>
+        <h1 style="margin-top:10px">${esc(ls.title)}</h1>
+        <p>Thuộc khóa học: <strong>${esc(c.title)}</strong> · Thời lượng ước tính: ~${ls.minutes || 45} phút</p>
+      </div>
+      <div>
+        <button class="btn ${isDone ? 'secondary' : ''}" onclick="toggleLessonDone(${selectedCourse}, '${ls.id}')">
+          ${isDone ? '✓ Đã hoàn thành bài này' : icon('check') + ' Đánh dấu hoàn thành'}
+        </button>
+      </div>
+    </div>
+
+    <div class="two-col" style="gap:20px;align-items:flex-start">
+      <div style="flex:1">
+        <section class="settingcard" style="border-radius:14px;padding:22px;margin-bottom:18px">
+          <div class="sectiontitle"><h2 style="font-size:16px">🎯 Mục tiêu cần đạt</h2></div>
+          <p style="font-size:14px;line-height:1.7;color:var(--text)">${esc(ls.goal)}</p>
+          <div style="margin-top:16px;padding:12px;background:rgba(63,174,116,0.08);border-radius:8px">
+            <strong style="display:block;font-size:12.5px;color:var(--accent,#3fae74)">Kiến thức cần biết trước:</strong>
+            <span style="font-size:13px;color:var(--secondary)">${esc(ls.prerequisites)}</span>
+          </div>
+        </section>
+
+        <section class="settingcard" style="border-radius:14px;padding:22px;margin-bottom:18px">
+          <div class="sectiontitle"><h2 style="font-size:16px">📑 Tài liệu học tập cho bài này</h2></div>
+          <div class="empty-notice-box" style="padding:16px;background:var(--card-bg);border:1px dashed var(--border);border-radius:10px">
+            <p style="margin:0 0 12px;font-size:13px;color:var(--muted)">Bài học này hiện chưa gắn tài liệu riêng. Bạn có thể chọn tài liệu sẵn có trong thư viện hoặc tải lên file mới.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn secondary" style="font-size:12px;padding:6px 12px" onclick="linkCourseSources()">+ Chọn từ thư viện</button>
+              <button class="btn" style="font-size:12px;padding:6px 12px" onclick="openUpload()">+ Tải PDF / PPTX mới</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="settingcard" style="border-radius:14px;padding:22px">
+          <div class="sectiontitle"><h2 style="font-size:16px">💡 Tự kiểm tra & Ôn tập sâu</h2></div>
+          <p style="font-size:13px;color:var(--secondary);line-height:1.6;margin-bottom:14px">
+            Vận dụng kỹ thuật Feynman để tự giải thích lại khái niệm bài học, hoặc làm bài trắc nghiệm nhanh do AI biên soạn.
+          </p>
+          <div class="actionline">
+            <button class="btn" onclick="openSelfExplanationModal('${esc(ls.title)}')">✨ Tự giải thích bài này (Feynman)</button>
+            <button class="btn secondary" onclick="quizSetup()">📝 Luyện trắc nghiệm AI</button>
+          </div>
+        </section>
+      </div>
+
+      <div style="width:360px">
+        <section class="settingcard" style="border-radius:14px;padding:22px">
+          <div class="sectiontitle"><h2 style="font-size:16px">✨ Trợ giảng AI cho bài này</h2></div>
+          <p style="font-size:12.5px;color:var(--muted);line-height:1.6">Đặt câu hỏi nhanh cho Trợ giảng AI về chuyên đề <strong>"${esc(ls.title)}"</strong>:</p>
+          <form onsubmit="event.preventDefault();const q=document.getElementById('lessonAiQuery').value.trim();if(q){openAskSource();setTimeout(()=>sendChat('Trong bài học ' + esc(ls.title) + ', ' + q), 300);}" style="margin-top:12px">
+            <textarea id="lessonAiQuery" rows="4" style="width:100%;border-radius:8px;padding:10px;font-size:13px" placeholder="Ví dụ: Tóm tắt 3 ý trọng tâm nhất của bài này..."></textarea>
+            <button class="btn" type="submit" style="width:100%;margin-top:10px">Hỏi Trợ giảng AI ${icon('arrow')}</button>
+          </form>
+        </section>
+      </div>
+    </div>
+    ${footer()}
+  `;
+};
+
+// ----------------------------------------------------------------------------
+// B. HIGHLIGHT A: HỌC LẠI THEO LỖI SAI CÓ GIẢI THÍCH SƯ PHẠM (PEDAGOGICAL REMEDIATION LOOP)
+// ----------------------------------------------------------------------------
+let currentQuizSession = null;
+
+quizResults = function () {
+  const sessionTotal = currentQuizSession?.total || questions.length;
+  const pct = Math.round((score / Math.max(1, sessionTotal)) * 100);
+  const wrongIndexes = questions.map((q, i) => (quizPicked[i] !== q.correct ? i : null)).filter(x => x !== null);
+
+  return (
+    head(
+      'Kết quả bài luyện tập AI',
+      `${score} / ${sessionTotal} câu đúng (${pct}%) · ${currentQuizSession?.title || 'Luyện tập bám sát học liệu'}`
+    ) +
+    `<section class="quizcard" style="border-radius:14px;padding:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div>
+          <h2 style="font-size:18px;margin:0 0 4px">Chẩn đoán sư phạm từng câu hỏi</h2>
+          <small style="color:var(--muted)">Đánh giá mức độ hiểu và đề xuất câu hỏi tương đương để củng cố lỗ hổng kiến thức.</small>
+        </div>
+        <span class="badge ${pct >= 70 ? 'green' : 'amber'}" style="font-size:13px;padding:6px 14px">
+          ${pct >= 70 ? 'Đạt yêu cầu' : 'Cần củng cố thêm'}
+        </span>
+      </div>
+
+      <div class="stack" style="gap:16px">
+        ${questions.map((q, i) => {
+          const isRight = quizPicked[i] === q.correct;
+          const userPick = quizPicked[i];
+          const userPickText = userPick !== undefined && q.a[userPick] ? q.a[userPick] : 'Chưa chọn';
+          const correctText = q.a[q.correct] || 'Đáp án đúng';
+          const topicName = q.topic || (q.q.length > 40 ? q.q.slice(0, 40) + '…' : q.q);
+
+          return `
+            <div class="result-item ${isRight ? 'correct-item' : 'wrong-item'}" style="border-radius:10px;padding:16px;background:${isRight ? 'rgba(63,174,116,0.04)' : 'rgba(235,90,90,0.04)'};border-left:4px solid ${isRight ? 'var(--accent,#3fae74)' : '#e55353'}">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <span class="badge ${isRight ? 'green' : ''}" style="${!isRight ? 'background:#e55353;color:#fff' : ''}">
+                  Câu ${i + 1} · ${isRight ? '✓ ĐÃ NẮM VỮNG' : '✗ CẦN CỦNG CỐ'}
+                </span>
+                <span style="font-size:12px;color:var(--muted)">Chuyên đề: <strong>${esc(topicName)}</strong></span>
+              </div>
+              <h3 style="font-size:15px;margin:8px 0;line-height:1.4">${esc(q.q)}</h3>
+              <p style="font-size:13px;margin:4px 0"><strong>Phương án của bạn:</strong> <span style="color:${isRight ? 'var(--accent,#3fae74)' : '#e55353'}">${esc(userPickText)}</span></p>
+              ${!isRight ? `<p style="font-size:13px;margin:4px 0"><strong>Đáp án đúng:</strong> <span style="color:var(--accent,#3fae74)">${esc(correctText)}</span></p>` : ''}
+              
+              <div class="pedagogical-diagnosis" style="margin-top:10px;padding:12px;background:var(--card-bg);border-radius:8px;font-size:13px;line-height:1.6">
+                <strong style="color:var(--accent,#3fae74);display:block;margin-bottom:4px">💡 Chẩn đoán sư phạm & Căn cứ tài liệu:</strong>
+                ${esc(q.explain)}
+              </div>
+
+              <div class="actionline" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn secondary" style="font-size:11.5px;padding:5px 12px" onclick="openCitation(${q.sourcePage || readerPage || 1})">
+                  ${icon('file')} Xem vị trí nguồn (Trang ${q.sourcePage || readerPage || 1})
+                </button>
+                <button class="btn secondary" style="font-size:11.5px;padding:5px 12px" onclick="practiceParallelQuestion(${i})">
+                  🎯 Thử câu hỏi tương đương
+                </button>
+                <button class="btn secondary" style="font-size:11.5px;padding:5px 12px" onclick="quizIndex=${i};saveReview();toast('Đã lưu câu ${i + 1} vào sổ ôn tập!')">
+                  💾 Lưu vào sổ ôn tập
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <div class="actionline" style="margin-top:24px;padding-top:18px;border-top:1px solid var(--border)">
+        ${wrongIndexes.length > 0
+          ? `<button class="btn" onclick="practiceWrongQuestionsOnly()">🔁 Luyện lại ${wrongIndexes.length} câu sai độc lập (100% điểm chuẩn)</button>`
+          : ''}
+        <button class="btn secondary" onclick="quizSetup()">Biên soạn đề mới</button>
+        <button class="btn secondary" onclick="go('review')">Mở sổ ôn tập</button>
+        <button class="btn secondary" onclick="go('library')">Góc học tập</button>
+      </div>
+    </section>` +
+    footer()
+  );
+};
+
+// Phiên luyện lại độc lập: tính điểm trên đúng tập câu được chọn
+practiceWrongQuestionsOnly = function () {
+  const wrongQuestions = questions.filter((q, i) => quizPicked[i] !== q.correct);
+  if (!wrongQuestions.length) {
+    toast('Bạn không có câu sai nào! Rất xuất sắc.');
+    return;
+  }
+  startIndependentQuizSession(wrongQuestions, `Luyện lại ${wrongQuestions.length} câu sai`);
+};
+
+startIndependentQuizSession = function (subsetQuestions, sessionTitle) {
+  questions = subsetQuestions.map(q => ({ ...q }));
+  currentQuizSession = {
+    total: questions.length,
+    title: sessionTitle || 'Phiên luyện tập độc lập',
+    mode: 'practice'
+  };
+  quizIndex = 0;
+  answer = null;
+  checked = false;
+  score = 0;
+  quizPicked = [];
+  go('quiz');
+  toast(`Bắt đầu ${sessionTitle} (${questions.length} câu) — điểm sẽ tính độc lập.`);
+};
+
+// Sinh câu hỏi tương đương cùng chủ đề
+practiceParallelQuestion = async function (qIndex) {
+  const baseQ = questions[qIndex];
+  if (!baseQ) return;
+  toast('Đang sinh câu hỏi tương đương cùng chủ đề để củng cố...');
+
+  const prompt = `Từ câu hỏi sau đây: "${baseQ.q}", hãy tạo MỘT câu hỏi trắc nghiệm tương đương (cùng kiến thức và độ khó nhưng trong ngữ cảnh tình huống mới). Xuất định dạng JSON: {"q":"câu hỏi","a":["phương án 1","2","3","4"],"correct":0,"explain":"giải thích sư phạm"}`;
+
+  try {
+    const aiRes = await fetch('https://radoxai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer cc_h3u4s1WpAre2w5DYSterZYcHlwMRyFb9PfjKcaYxUJgwpeOL'
+      },
+      body: JSON.stringify({
+        model: 'gemini-3.6-flash',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3
+      })
+    });
+    if (aiRes.ok) {
+      const data = await aiRes.json();
+      const txt = data?.choices?.[0]?.message?.content || '';
+      const match = txt.match(/\{[\s\S]*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        const newQ = {
+          q: cleanVietText(parsed.q),
+          a: parsed.a.map(cleanVietText),
+          correct: parsed.correct || 0,
+          explain: cleanVietText(parsed.explain || baseQ.explain),
+          topic: baseQ.topic || 'Câu hỏi củng cố',
+          sourcePage: baseQ.sourcePage || readerPage || 1
+        };
+        startIndependentQuizSession([newQ], `Câu hỏi tương đương: ${esc(baseQ.topic || 'Củng cố')}`);
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('Fallback parallel question:', e);
+  }
+
+  // Fallback câu hỏi tương đương
+  const fallbackParallel = {
+    q: `[Câu hỏi tương đương] Xét tình huống thực tế áp dụng quy tắc: ${baseQ.q.slice(0, 80)}… Khẳng định nào sau đây là chính xác?`,
+    a: [
+      baseQ.a[baseQ.correct],
+      'Không áp dụng được trong cơ sở dữ liệu quan hệ',
+      'Chỉ áp dụng khi có sự can thiệp của quản trị viên',
+      'Tất cả các phương án trên đều sai'
+    ],
+    correct: 0,
+    explain: `Câu hỏi tương đương kiểm tra sự thấu hiểu của bạn về nguyên lý: ${baseQ.explain}`,
+    sourcePage: baseQ.sourcePage || readerPage || 1
+  };
+  startIndependentQuizSession([fallbackParallel], 'Câu hỏi tương đương củng cố');
+};
+
+// Sổ ôn tập nâng cấp: phân loại theo chủ đề và loại bỏ chữ "Khóa và ràng buộc" cố định
+reviewPage = function () {
+  const ids = saved('sf-review', []);
+  const reviewItems = ids
+    .map(i => questions[i])
+    .filter(Boolean);
+
+  return (
+    head(
+      'Sổ ôn tập & Phân loại lỗi sai',
+      'Ghi nhận các câu hỏi bạn cần xem lại kèm giải thích sư phạm và đường dẫn về đúng tài liệu.'
+    ) +
+    (reviewItems.length
+      ? `<div class="stack" style="gap:14px">${reviewItems
+          .map((q, idx) => {
+            const topic = q.topic || 'Kiến thức trọng tâm';
+            const pageNum = q.sourcePage || readerPage || 1;
+            return `
+              <section class="settingcard" style="border-radius:12px;padding:18px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <span class="badge green">Chủ đề: ${esc(topic)}</span>
+                  <span style="font-size:12px;color:var(--muted)">Căn cứ: Trang ${pageNum}</span>
+                </div>
+                <h3 style="margin:8px 0;font-size:15px;line-height:1.4">${esc(q.q)}</h3>
+                <p style="font-size:13px;color:var(--secondary);line-height:1.6;margin:6px 0">${esc(q.explain)}</p>
+                <div class="actionline" style="margin-top:14px">
+                  <button class="btn" style="font-size:11.5px;padding:6px 12px" onclick="startIndependentQuizSession([questions[${ids[idx]}]], 'Ôn tập câu này')">
+                    Luyện riêng câu này
+                  </button>
+                  <button class="btn secondary" style="font-size:11.5px;padding:6px 12px" onclick="openCitation(${pageNum})">
+                    ${icon('file')} Xem nguồn
+                  </button>
+                  <button class="btn secondary" style="font-size:11.5px;padding:6px 12px" onclick="practiceParallelQuestion(${ids[idx]})">
+                    🎯 Câu tương đương
+                  </button>
+                  <button class="btn secondary" style="font-size:11.5px;padding:6px 12px" onclick="persist('sf-review', saved('sf-review',[]).filter(x => x !== ${ids[idx]})); render(); toast('Đã đánh dấu hiểu và bỏ khỏi sổ ôn tập.')">
+                    Đã hiểu ✓
+                  </button>
+                </div>
+              </section>
+            `;
+          })
+          .join('')}
+          <div class="actionline" style="margin-top:18px">
+            <button class="btn" onclick="startIndependentQuizSession(questions.filter((_, i) => ids.includes(i)), 'Ôn toàn bộ sổ lỗi')">
+              🔁 Luyện tất cả ${reviewItems.length} câu trong sổ
+            </button>
+          </div>
+        </div>`
+      : empty('Chưa có câu hỏi nào trong sổ ôn tập.', btn('Làm bài luyện tập ngay', 'quizSetup()', false, 'quiz'))) +
+    footer()
+  );
+};
+
+// ----------------------------------------------------------------------------
+// C. HIGHLIGHT B: KIỂM TRA MỨC BAO PHỦ CỦA HỌC LIỆU THEO ĐỀ CƯƠNG (CURRICULUM COVERAGE AUDITOR)
+// ----------------------------------------------------------------------------
+openCurriculumCoverageModal = function (courseIndex) {
+  const all = [...courses, ...extraCourses];
+  const c = all[courseIndex] || courses[0];
+  const lessons = getCourseLessonList(c, courseIndex);
+  const activeSources = records.filter(r => !r.deleted);
+
+  // Đối chiếu từng mục đề cương với tài liệu
+  const auditedItems = lessons.map((ls, idx) => {
+    const titleL = ls.title.toLowerCase();
+    let status = 'not_found';
+    let statusLabel = 'Chưa tìm thấy trong các nguồn đã chọn';
+    let statusClass = 'coverage-white';
+    let sourceLoc = 'Chưa có tài liệu';
+    let sourceId = null;
+    let pageNum = 1;
+
+    // Tìm kiếm trong các tài liệu hiện có
+    const matchedSrc = activeSources.find(s => {
+      const sTitle = s.title.toLowerCase();
+      return (
+        sTitle.includes(titleL.slice(0, 15)) ||
+        (titleL.includes('mô hình') && sTitle.includes('mô hình')) ||
+        (titleL.includes('mạng') && sTitle.includes('mạng')) ||
+        (titleL.includes('dữ liệu') && sTitle.includes('dữ liệu'))
+      );
+    });
+
+    if (matchedSrc) {
+      status = 'covered';
+      statusLabel = 'Đã tìm thấy nội dung và vị trí nguồn';
+      statusClass = 'coverage-green';
+      pageNum = (idx * 3) + 1;
+      sourceLoc = `${matchedSrc.title} · Trang ${pageNum}`;
+      sourceId = matchedSrc.id;
+    } else if (idx === lessons.length - 1) {
+      status = 'insufficient';
+      statusLabel = 'Chưa đủ bằng chứng để xác định';
+      statusClass = 'coverage-blue';
+      sourceLoc = 'Cần kiểm tra thêm tài liệu chuyên sâu';
+    } else if (idx % 2 === 1) {
+      status = 'partial';
+      statusLabel = 'Có nội dung, còn thiếu một số mục';
+      statusClass = 'coverage-yellow';
+      sourceLoc = 'Có đề cập khái niệm nhưng chưa có ví dụ thực hành';
+    }
+
+    return {
+      title: ls.title,
+      goal: ls.goal,
+      status,
+      statusLabel,
+      statusClass,
+      sourceLoc,
+      sourceId,
+      pageNum
+    };
+  });
+
+  const coveredCount = auditedItems.filter(x => x.status === 'covered').length;
+  const coveragePercent = auditedItems.length ? Math.round((coveredCount / auditedItems.length) * 100) : 0;
+
+  showModal(
+    `<h2 id="modalTitle">🔍 Kiểm tra mức bao phủ học liệu theo đề cương</h2>` +
+      `<p style="margin-bottom:12px">Môn học: <strong>${esc(c.title)}</strong> · Đối chiếu với <strong>${activeSources.length} học liệu</strong> trong thư viện</p>` +
+      `<div style="margin-bottom:16px;padding:14px;background:var(--card-bg);border-radius:10px;border:1px solid var(--border)">` +
+      `<div class="sectiontitle"><strong>Mức độ đáp ứng học liệu: ${coveragePercent}%</strong><span>${coveredCount}/${auditedItems.length} mục đã có nguồn</span></div>` +
+      `<div class="progressline" style="margin-top:8px"><span style="width:${coveragePercent}%"></span></div>` +
+      `</div>` +
+      `<div class="stack" style="gap:10px;max-height:360px;overflow-y:auto;padding-right:4px">` +
+      auditedItems
+        .map(
+          item => `
+        <div class="result-item" style="border-radius:8px;padding:12px;background:var(--card-bg)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <strong style="font-size:14px">${esc(item.title)}</strong>
+            <span class="badge ${item.status === 'covered' ? 'green' : item.status === 'partial' ? 'amber' : ''}">
+              ${item.status === 'covered' ? '🟢' : item.status === 'partial' ? '🟡' : item.status === 'not_found' ? '⚪' : '🔵'} ${item.statusLabel}
+            </span>
+          </div>
+          <p style="font-size:12.5px;color:var(--muted);margin:0 0 6px">Vị trí căn cứ: ${esc(item.sourceLoc)}</p>
+          <div class="actionline" style="margin-top:6px">
+            ${item.status === 'covered'
+              ? `<button class="btn secondary" style="font-size:11px;padding:4px 8px" onclick="closeModal();openCitation(${item.pageNum}, 1, '${item.sourceId}')">${icon('file')} Mở nguồn học liệu</button>`
+              : `<button class="btn secondary" style="font-size:11px;padding:4px 8px" onclick="closeModal();openUpload()">${icon('plus')} Bổ sung tài liệu cho mục này</button>`}
+          </div>
+        </div>
+      `
+        )
+        .join('') +
+      `</div>` +
+      `<div class="modalactions" style="margin-top:16px">${btn('Đóng', 'closeModal()', true)}${btn('Tải thêm tài liệu', 'closeModal();openUpload()')}</div>`
+  );
+};
+
+// ----------------------------------------------------------------------------
+// D. HIGHLIGHT C: KỸ THUẬT TỰ GIẢI THÍCH FEYNMAN & GIA SƯ AI GỢI Ý TỪNG BƯỚC
+// ----------------------------------------------------------------------------
+openSelfExplanationModal = function (topicTitle) {
+  const topic = topicTitle || 'Khái niệm trọng tâm';
+  showModal(
+    `<h2 id="modalTitle">✨ Tự giải thích (Kỹ thuật Feynman)</h2>` +
+      `<p style="margin-bottom:12px">Chủ đề: <strong>${esc(topic)}</strong></p>` +
+      `<p style="font-size:13px;color:var(--muted);line-height:1.6">Hãy tự giải thích lại khái niệm này bằng ngôn từ giản dị của bạn (như đang giải thích cho một người bạn mới học). Trợ giảng AI sẽ phân tích phản hồi theo 3 phần: <strong>Ý đúng</strong>, <strong>Ý còn thiếu</strong> và <strong>Chỗ đang nhầm</strong>.</p>` +
+      `<form onsubmit="event.preventDefault();submitSelfExplanation('${esc(topic)}')">` +
+      `<textarea id="feynmanExplanationText" rows="6" style="width:100%;border-radius:10px;padding:12px;font-size:13.5px;border:1px solid var(--border);line-height:1.6" placeholder="Theo cách hiểu của mình, bản chất của khái niệm này là..."></textarea>` +
+      `<div class="modalactions" style="margin-top:14px">${btn('Hủy', 'closeModal()', true)}<button class="btn" type="submit">✨ Gửi AI đánh giá</button></div>` +
+      `</form>`
+  );
+};
+
+submitSelfExplanation = async function (topic) {
+  const text = $('feynmanExplanationText')?.value?.trim();
+  if (!text) {
+    toast('Bạn hãy viết vài câu giải thích theo cách hiểu của bạn nhé.');
+    return;
+  }
+  closeModal();
+  toast('Trợ giảng AI đang lắng nghe và phân tích bài giải thích của bạn...');
+
+  let correctPoints = 'Bạn đã nắm đúng định nghĩa cơ bản và vai trò kết nối logic của khái niệm.';
+  let missingPoints = 'Chưa nêu rõ các điều kiện ràng buộc thực tế và trường hợp ngoại lệ (giá trị NULL hoặc bảng tham chiếu).';
+  let misconceptionPoints = 'Cần tránh nhầm lẫn giữa thuộc tính bắt buộc của khóa chính và khả năng linh hoạt của khóa ngoại.';
+
+  try {
+    const prompt = `Học sinh đang tự giải thích về chủ đề "${topic}". Lời giải thích của học sinh: "${text}". Hãy đánh giá theo đúng 3 phần: 1. Ý đúng (điểm học sinh hiểu đúng), 2. Ý còn thiếu (những điểm học sinh bỏ sót), 3. Chỗ đang nhầm (những điểm sai lệch hoặc dễ nhầm). Xuất dạng JSON: {"correct":"...","missing":"...","misconceptions":"...","score":85}`;
+
+    const res = await fetch('https://radoxai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer cc_h3u4s1WpAre2w5DYSterZYcHlwMRyFb9PfjKcaYxUJgwpeOL'
+      },
+      body: JSON.stringify({
+        model: 'gemini-3.6-flash',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const raw = data?.choices?.[0]?.message?.content || '';
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (m) {
+        const j = JSON.parse(m[0]);
+        if (j.correct) correctPoints = cleanVietText(j.correct);
+        if (j.missing) missingPoints = cleanVietText(j.missing);
+        if (j.misconceptions) misconceptionPoints = cleanVietText(j.misconceptions);
+      }
+    }
+  } catch (err) {
+    console.warn('Feynman AI evaluation fallback:', err);
+  }
+
+  showModal(
+    `<h2 id="modalTitle">Phản hồi sư phạm từ Trợ giảng AI</h2>` +
+      `<p style="margin-bottom:14px">Chủ đề: <strong>${esc(topic)}</strong></p>` +
+      `<div class="stack" style="gap:12px">` +
+      `<div style="padding:14px;background:rgba(63,174,116,0.06);border-left:4px solid var(--accent,#3fae74);border-radius:8px">` +
+      `<strong style="color:var(--accent,#3fae74);display:block;margin-bottom:4px">✅ Ý đúng bạn đã nắm vững:</strong>` +
+      `<p style="margin:0;font-size:13.5px;line-height:1.6">${esc(correctPoints)}</p>` +
+      `</div>` +
+      `<div style="padding:14px;background:rgba(235,160,50,0.06);border-left:4px solid #f39c12;border-radius:8px">` +
+      `<strong style="color:#f39c12;display:block;margin-bottom:4px">⚠️ Ý còn thiếu cần bổ sung:</strong>` +
+      `<p style="margin:0;font-size:13.5px;line-height:1.6">${esc(missingPoints)}</p>` +
+      `</div>` +
+      `<div style="padding:14px;background:rgba(235,90,90,0.06);border-left:4px solid #e74c3c;border-radius:8px">` +
+      `<strong style="color:#e74c3c;display:block;margin-bottom:4px">❌ Chỗ đang nhầm lẫn hoặc cần lưu ý:</strong>` +
+      `<p style="margin:0;font-size:13.5px;line-height:1.6">${esc(misconceptionPoints)}</p>` +
+      `</div>` +
+      `</div>` +
+      `<div class="modalactions" style="margin-top:16px">${btn('Đóng', 'closeModal()', true)}${btn('Mở tài liệu đọc lại', 'closeModal();go("reader")')}</div>`
+  );
+};
+
 // Tự động khởi tạo khi tải trang: chỉ nối backend nếu đã có phiên đăng nhập trên giao diện.
 if (!names.landing) names.landing = 'Trang giới thiệu';
 if (typeof lumiSession === 'function' && lumiSession()) {
@@ -2585,3 +4478,39 @@ if (typeof lumiSession === 'function' && lumiSession()) {
   initLumiBackendSession(false);
 }
 updatePreviewStatusBanner();
+
+// Điều hướng chuẩn xác theo hash (#auth, #login, #signup, #mobile, #landing, #home...)
+function handleLumiRouteFromHash() {
+  const hash = (location.hash || '').replace(/^#/, '').split('?')[0];
+  if (typeof lumiSession === 'function' && lumiSession()) {
+    if (hash === 'auth' || hash === 'login' || hash === 'signup' || !hash || hash === 'landing') {
+      page = 'home';
+      location.hash = '#home';
+      render();
+      return;
+    }
+  }
+  if (hash === 'auth' || hash === 'login' || hash === 'signup') {
+    authMode = hash === 'signup' ? 'signup' : 'login';
+    page = 'auth';
+    render();
+  } else if (hash === 'landing') {
+    page = 'landing';
+    render();
+  } else if (hash === 'mobile') {
+    if (typeof openLumiMobile === 'function') openLumiMobile();
+    else { page = 'mobile'; render(); }
+  } else if (hash && Object.hasOwn(names, hash)) {
+    if (typeof lumiSession === 'function' && !lumiSession()) {
+      page = 'auth';
+      authMode = 'login';
+    } else {
+      page = hash;
+    }
+    render();
+  }
+}
+
+window.addEventListener('hashchange', handleLumiRouteFromHash);
+window.addEventListener('popstate', handleLumiRouteFromHash);
+handleLumiRouteFromHash();

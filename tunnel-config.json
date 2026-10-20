@@ -1,6 +1,7 @@
 {
-  "api_base": "https://rugs-compete-staying-shareware.trycloudflare.com/api/v1",
-  "tunnel_url": "https://rugs-compete-staying-shareware.trycloudflare.com",
-  "web_app_url": "https://rugs-compete-staying-shareware.trycloudflare.com/app/",
-  "updated_at": "2026-10-18T18:37:00+07:00"
+  "cloud_mode": "direct_supabase",
+  "supabase_url": "https://baenwfcstfywrbanweks.supabase.co",
+  "storage_bucket": "sources",
+  "api_base": "",
+  "updated_at": "2026-10-20T10:30:00+07:00"
 }

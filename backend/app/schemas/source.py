@@ -115,3 +115,43 @@ class SourceUpdateRequest(BaseModel):
     is_favorite: Optional[bool] = None
     description: Optional[str] = Field(None, max_length=2000)
 
+
+class VideoChapterItem(BaseModel):
+    seconds: int = Field(default=0, description="Mốc thời gian tính bằng giây")
+    timestamp: str = Field(default="00:00", description="Mốc thời gian dạng mm:ss")
+    title: str = Field(..., description="Tiêu đề phân đoạn video")
+    summary: str = Field(..., description="Tóm tắt ngắn gọn nội dung phân đoạn")
+
+
+class VideoIngestRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=300, description="Tiêu đề bài giảng video")
+    video_url: Optional[str] = Field(default=None, description="Đường dẫn video (YouTube URL hoặc MP4 URL)")
+    video_base64: Optional[str] = Field(default=None, description="Dữ liệu file video (nếu tải trực tiếp)")
+    description: Optional[str] = Field(default=None, max_length=2000)
+    transcript_text: Optional[str] = Field(default=None, description="Phụ đề hoặc ghi chú nội dung bài giảng nếu có")
+
+
+class VideoAnalysisResponse(BaseModel):
+    source_id: UUID
+    title: str
+    video_url: Optional[str] = None
+    kind: str = "video_link"
+    duration_seconds: int = 240
+    summary: str
+    key_takeaways: List[str]
+    chapters: List[VideoChapterItem]
+    quiz_sample: Optional[List[Dict[str, Any]]] = None
+
+
+class VideoChatRequest(BaseModel):
+    question: str = Field(..., min_length=1, description="Câu hỏi về video")
+    current_time_seconds: Optional[int] = Field(default=0, description="Vị trí phát hiện tại của video")
+    history: Optional[List[Dict[str, str]]] = Field(default=[], description="Lịch sử tin nhắn")
+
+
+class VideoChatResponse(BaseModel):
+    answer: str
+    relevant_timestamp: Optional[str] = None
+    relevant_seconds: Optional[int] = None
+    suggested_followups: Optional[List[str]] = None
+

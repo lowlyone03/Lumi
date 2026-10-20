@@ -182,3 +182,711 @@ html[data-theme=dark] .app.mobile,html[data-theme=dark] .mobile .main,html[data-
   grid-template-columns: 280px minmax(0, 1fr) !important;
   gap: clamp(20px, 2vw, 36px) !important;
 }
+
+/* ==========================================================================
+ * 1. GIAO DIỆN CHỈ SỐ GÓC HỌC TẬP (DASHBOARD KPI METRICS GRID - ẢNH SỐ 1)
+ * ========================================================================== */
+.l-library-kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+  margin: 18px 0 24px !important;
+}
+
+@media (max-width: 900px) {
+  .l-library-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+}
+
+.l-kpi-card {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 16px 18px !important;
+  background: var(--surface, #ffffff) !important;
+  border: 1px solid var(--border, #dce3db) !important;
+  border-radius: 14px !important;
+  cursor: pointer !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
+  text-align: left !important;
+}
+
+.l-kpi-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: var(--accent, #3fae74) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06) !important;
+}
+
+.l-kpi-card:active {
+  transform: scale(0.98) !important;
+}
+
+.kpi-icon-wrap {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  border-radius: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  font-size: 22px !important;
+}
+
+.kpi-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.kpi-number {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text, #27352e);
+  line-height: 1.1;
+  margin-bottom: 2px;
+}
+
+.kpi-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #27352e);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpi-hint {
+  font-size: 11px;
+  color: var(--muted, #68766b);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpi-arrow {
+  color: var(--muted, #68766b);
+  opacity: 0.5;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.l-kpi-card:hover .kpi-arrow {
+  opacity: 1;
+  transform: translateX(3px);
+  color: var(--accent, #3fae74);
+}
+
+/* ==========================================================================
+ * 2. GIAO DIỆN VIDEO BÀI GIẢNG ĐA NỀN TẢNG (WEB & MOBILE VIEW - ẢNH SỐ 3)
+ * ========================================================================== */
+.video-pagehead-desktop {
+  display: block;
+}
+.video-pagehead-mobile {
+  display: none;
+}
+
+.mobile .video-pagehead-desktop,
+.app.mobile .video-pagehead-desktop,
+[data-device="phone"] .video-pagehead-desktop {
+  display: none !important;
+}
+
+.mobile .video-pagehead-mobile,
+.app.mobile .video-pagehead-mobile,
+[data-device="phone"] .video-pagehead-mobile {
+  display: block !important;
+  margin-bottom: 6px !important;
+}
+
+.video-player-wrap {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface2, #f5f7f3);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.video-player-wrap iframe,
+.video-player-wrap video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  background: transparent;
+}
+
+.mobile .video-player-wrap,
+.app.mobile .video-player-wrap,
+[data-device="phone"] .video-player-wrap {
+  border-radius: 10px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+}
+
+.video-layout {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 22px;
+  margin-top: 14px;
+}
+
+.mobile .video-layout,
+.app.mobile .video-layout,
+[data-device="phone"] .video-layout {
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+  margin-top: 4px !important;
+}
+
+@media (max-width: 820px) {
+  .video-layout {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    margin-top: 4px !important;
+  }
+}
+
+.video-action-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 10px;
+  margin-top: 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.video-action-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.video-action-scroll button {
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 8px 14px;
+  border-radius: 20px;
+}
+
+.video-mobile-tabs {
+  display: none;
+  background: var(--surface2, #f5f7f3);
+  padding: 4px;
+  border-radius: 10px;
+  margin: 14px 0 16px;
+  gap: 4px;
+}
+
+.mobile .video-mobile-tabs,
+.app.mobile .video-mobile-tabs,
+[data-device="phone"] .video-mobile-tabs {
+  display: flex !important;
+}
+
+@media (max-width: 820px) {
+  .video-mobile-tabs {
+    display: flex !important;
+  }
+}
+
+.video-mobile-tabs button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--secondary, #4f6056);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.video-mobile-tabs button.active {
+  background: var(--surface, #ffffff);
+  color: var(--accent, #3fae74);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.video-page-container {
+  padding-bottom: 24px;
+}
+
+.mobile .video-page-container,
+.app.mobile .video-page-container,
+[data-device="phone"] .video-page-container {
+  padding-bottom: 100px !important;
+}
+
+@media (max-width: 820px) {
+  .video-page-container {
+    padding-bottom: 100px !important;
+  }
+}
+
+/* Mobile Tab Panels Visibility */
+.mobile .video-page-container.tab-chapters #videoChaptersPanel,
+.app.mobile .video-page-container.tab-chapters #videoChaptersPanel,
+[data-device="phone"] .video-page-container.tab-chapters #videoChaptersPanel {
+  display: block !important;
+}
+.mobile .video-page-container.tab-chapters #videoAiPanel,
+.app.mobile .video-page-container.tab-chapters #videoAiPanel,
+[data-device="phone"] .video-page-container.tab-chapters #videoAiPanel,
+.mobile .video-page-container.tab-chapters #videoSummaryPanel,
+.app.mobile .video-page-container.tab-chapters #videoSummaryPanel,
+[data-device="phone"] .video-page-container.tab-chapters #videoSummaryPanel {
+  display: none !important;
+}
+
+.mobile .video-page-container.tab-chat #videoAiPanel,
+.app.mobile .video-page-container.tab-chat #videoAiPanel,
+[data-device="phone"] .video-page-container.tab-chat #videoAiPanel {
+  display: block !important;
+}
+.mobile .video-page-container.tab-chat #videoChaptersPanel,
+.app.mobile .video-page-container.tab-chat #videoChaptersPanel,
+[data-device="phone"] .video-page-container.tab-chat #videoChaptersPanel,
+.mobile .video-page-container.tab-chat #videoSummaryPanel,
+.app.mobile .video-page-container.tab-chat #videoSummaryPanel,
+[data-device="phone"] .video-page-container.tab-chat #videoSummaryPanel {
+  display: none !important;
+}
+
+.mobile .video-page-container.tab-summary #videoSummaryPanel,
+.app.mobile .video-page-container.tab-summary #videoSummaryPanel,
+[data-device="phone"] .video-page-container.tab-summary #videoSummaryPanel {
+  display: block !important;
+}
+.mobile .video-page-container.tab-summary #videoChaptersPanel,
+.app.mobile .video-page-container.tab-summary #videoChaptersPanel,
+[data-device="phone"] .video-page-container.tab-summary #videoChaptersPanel,
+.mobile .video-page-container.tab-summary #videoAiPanel,
+.app.mobile .video-page-container.tab-summary #videoAiPanel,
+[data-device="phone"] .video-page-container.tab-summary #videoAiPanel {
+  display: none !important;
+}
+
+@media (max-width: 820px) {
+  .video-page-container.tab-chapters #videoChaptersPanel { display: block !important; }
+  .video-page-container.tab-chapters #videoAiPanel { display: none !important; }
+  .video-page-container.tab-chapters #videoSummaryPanel { display: none !important; }
+
+  .video-page-container.tab-chat #videoAiPanel { display: block !important; }
+  .video-page-container.tab-chat #videoChaptersPanel { display: none !important; }
+  .video-page-container.tab-chat #videoSummaryPanel { display: none !important; }
+
+  .video-page-container.tab-summary #videoSummaryPanel { display: block !important; }
+  .video-page-container.tab-summary #videoChaptersPanel { display: none !important; }
+  .video-page-container.tab-summary #videoAiPanel { display: none !important; }
+}
+
+/* ==========================================================================
+ * 3. FIX TRIỆT ĐỂ BỐ CỤC MOBILE VÀ KHUNG ĐIỆN THOẠI (CUỘN MƯỢT 100%)
+ * ========================================================================== */
+@keyframes lumiSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.mobile.app,
+.app.mobile {
+  width: 414px !important;
+  max-width: calc(100% - 24px) !important;
+  margin: 16px auto 30px auto !important;
+  border-radius: 28px !important;
+  border: 2px solid var(--border, #dce2d8) !important;
+  box-shadow: 0 16px 48px rgba(23, 105, 87, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  background: var(--page) !important;
+  height: min(850px, calc(100vh - 65px)) !important;
+  max-height: calc(100vh - 65px) !important;
+  min-height: 580px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+@media (max-width: 600px) {
+  .mobile.app,
+  .app.mobile {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
+}
+
+.mobile .workspace,
+.app.mobile .workspace {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.mobile .topbar,
+.app.mobile .topbar {
+  flex-shrink: 0 !important;
+  height: 60px !important;
+  z-index: 10 !important;
+}
+
+.mobile .main,
+.app.mobile .main,
+[data-device="phone"] .main {
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 12px 14px 115px !important;
+  scroll-behavior: smooth;
+}
+
+.mobile .bottomnav,
+.app.mobile .bottomnav {
+  position: absolute !important;
+  bottom: 12px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: calc(100% - 24px) !important;
+  max-width: 380px !important;
+  z-index: 100 !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 28px !important;
+  background: var(--surface2, #1b2029) !important;
+  backdrop-filter: blur(20px) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25) !important;
+  padding: 4px 6px !important;
+}
+
+html[data-device="phone"] .app,
+html[data-device="phone"] .mobile.app {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+}
+
+html[data-device="phone"] .bottomnav {
+  position: fixed !important;
+  bottom: max(10px, env(safe-area-inset-bottom)) !important;
+}
+
+/* Thanh cuộn siêu mảnh, thanh lịch cho giao diện điện thoại (chuẩn iOS/Android) */
+.mobile .main::-webkit-scrollbar,
+.app.mobile .main::-webkit-scrollbar,
+[data-device="phone"] .main::-webkit-scrollbar {
+  width: 4px !important;
+}
+.mobile .main::-webkit-scrollbar-track,
+.app.mobile .main::-webkit-scrollbar-track,
+[data-device="phone"] .main::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+.mobile .main::-webkit-scrollbar-thumb,
+.app.mobile .main::-webkit-scrollbar-thumb,
+[data-device="phone"] .main::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.16) !important;
+  border-radius: 4px !important;
+}
+html[data-theme="dark"] .mobile .main::-webkit-scrollbar-thumb,
+html[data-theme="dark"] .app.mobile .main::-webkit-scrollbar-thumb,
+html[data-theme="dark"] [data-device="phone"] .main::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22) !important;
+}
+
+/* Đảm bảo khung đọc văn bản AI trên mobile cuộn liền mạch không bị lồng scrollbar */
+.mobile #lumiTextWrapper,
+.app.mobile #lumiTextWrapper,
+[data-device="phone"] #lumiTextWrapper {
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+
+.mobile .doc-mode-toggle button,
+.app.mobile .doc-mode-toggle button,
+[data-device="phone"] .doc-mode-toggle button {
+  padding: 4px 8px !important;
+  font-size: 10.5px !important;
+}
+
+/* ==========================================================================
+ * BENTO KPI GRID (GÓC HỌC TẬP - ẢNH 2)
+ * ========================================================================== */
+.l-library-kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+  margin: 18px 0 24px !important;
+}
+
+@media (max-width: 900px) {
+  .l-library-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+}
+
+.mobile .l-library-kpi-grid,
+.app.mobile .l-library-kpi-grid,
+[data-device="phone"] .l-library-kpi-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  margin: 12px 0 18px !important;
+}
+
+.l-kpi-card {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 16px 18px !important;
+  background: var(--surface, #ffffff) !important;
+  border: 1px solid var(--border, #dce3db) !important;
+  border-radius: 14px !important;
+  cursor: pointer !important;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
+}
+
+.l-kpi-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06) !important;
+  border-color: var(--accent) !important;
+}
+
+.l-kpi-card .kpi-icon-wrap {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  border-radius: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+.l-kpi-card .kpi-icon-wrap svg {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+.l-kpi-card.course-kpi .kpi-icon-wrap {
+  background: rgba(109, 94, 228, 0.12) !important;
+  color: #6d5ee4 !important;
+}
+
+.l-kpi-card.source-kpi .kpi-icon-wrap {
+  background: rgba(63, 174, 116, 0.12) !important;
+  color: #3fae74 !important;
+}
+
+.l-kpi-card.note-kpi .kpi-icon-wrap {
+  background: rgba(243, 156, 18, 0.12) !important;
+  color: #f39c12 !important;
+}
+
+.l-kpi-card.card-kpi .kpi-icon-wrap {
+  background: rgba(238, 84, 124, 0.12) !important;
+  color: #ee547c !important;
+}
+
+.mobile .l-kpi-card,
+.app.mobile .l-kpi-card,
+[data-device="phone"] .l-kpi-card {
+  padding: 12px 14px !important;
+  gap: 10px !important;
+  border-radius: 12px !important;
+}
+
+.mobile .l-kpi-card .kpi-icon-wrap,
+.app.mobile .l-kpi-card .kpi-icon-wrap,
+[data-device="phone"] .l-kpi-card .kpi-icon-wrap {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  border-radius: 10px !important;
+}
+
+.mobile .l-kpi-card .kpi-icon-wrap svg,
+.app.mobile .l-kpi-card .kpi-icon-wrap,
+[data-device="phone"] .l-kpi-card .kpi-icon-wrap svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+/* ==========================================================================
+ * TỐI ƯU VIDEO PLAYER MOBILE (ẢNH SỐ 3)
+ * ========================================================================== */
+.mobile .video-pagehead-desktop,
+.app.mobile .video-pagehead-desktop,
+[data-device="phone"] .video-pagehead-desktop {
+  display: none !important;
+}
+
+.mobile .video-pagehead-mobile,
+.app.mobile .video-pagehead-mobile,
+[data-device="phone"] .video-pagehead-mobile {
+  display: block !important;
+  margin: 0 0 10px 0 !important;
+}
+
+.mobile .video-player-wrap,
+.app.mobile .video-player-wrap,
+[data-device="phone"] .video-player-wrap {
+  border-radius: 12px !important;
+  background: #000 !important;
+  border: 1px solid var(--border) !important;
+  margin: 2px 0 10px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+  width: 100% !important;
+  aspect-ratio: 16 / 9 !important;
+  height: auto !important;
+  max-height: 200px !important;
+  overflow: hidden !important;
+}
+
+.mobile .video-player-wrap iframe,
+.app.mobile .video-player-wrap iframe,
+[data-device="phone"] .video-player-wrap iframe,
+.mobile .video-player-wrap video,
+.app.mobile .video-player-wrap video,
+[data-device="phone"] .video-player-wrap video {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 200px !important;
+  aspect-ratio: 16 / 9 !important;
+  border: 0 !important;
+  display: block !important;
+  background: transparent !important;
+}
+
+.mobile .video-action-scroll,
+.app.mobile .video-action-scroll,
+[data-device="phone"] .video-action-scroll {
+  display: flex !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  padding: 4px 2px 10px !important;
+  white-space: nowrap !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+}
+.mobile .video-action-scroll::-webkit-scrollbar,
+.app.mobile .video-action-scroll::-webkit-scrollbar,
+[data-device="phone"] .video-action-scroll::-webkit-scrollbar {
+  display: none !important;
+}
+
+.mobile .video-action-scroll .btn,
+.app.mobile .video-action-scroll .btn,
+[data-device="phone"] .video-action-scroll .btn {
+  font-size: 11px !important;
+  padding: 6px 12px !important;
+  flex-shrink: 0 !important;
+  border-radius: 20px !important;
+}
+
+/* Tabs on Mobile for Video: Show only ONE active panel */
+.mobile .video-mobile-tabs,
+.app.mobile .video-mobile-tabs,
+[data-device="phone"] .video-mobile-tabs {
+  display: flex !important;
+  gap: 6px !important;
+  margin: 8px 0 12px !important;
+  padding: 3px !important;
+  background: var(--surface2) !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--border) !important;
+}
+
+.mobile .video-mobile-tab-btn,
+.app.mobile .video-mobile-tab-btn,
+[data-device="phone"] .video-mobile-tab-btn {
+  flex: 1 !important;
+  padding: 6px 4px !important;
+  font-size: 11px !important;
+  border-radius: 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+  cursor: pointer !important;
+  font-weight: 500 !important;
+  text-align: center !important;
+}
+
+.mobile .video-mobile-tab-btn.active,
+.app.mobile .video-mobile-tab-btn.active,
+[data-device="phone"] .video-mobile-tab-btn.active {
+  background: var(--accent) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+
+.mobile .video-page-container.tab-chapters #videoChaptersPanel,
+.app.mobile .video-page-container.tab-chapters #videoChaptersPanel,
+[data-device="phone"] .video-page-container.tab-chapters #videoChaptersPanel {
+  display: block !important;
+}
+.mobile .video-page-container.tab-chapters #videoAiPanel,
+.app.mobile .video-page-container.tab-chapters #videoAiPanel,
+[data-device="phone"] .video-page-container.tab-chapters #videoAiPanel,
+.mobile .video-page-container.tab-chapters #videoSummaryPanel,
+.app.mobile .video-page-container.tab-chapters #videoSummaryPanel,
+[data-device="phone"] .video-page-container.tab-chapters #videoSummaryPanel {
+  display: none !important;
+}
+
+.mobile .video-page-container.tab-chat #videoAiPanel,
+.app.mobile .video-page-container.tab-chat #videoAiPanel,
+[data-device="phone"] .video-page-container.tab-chat #videoAiPanel {
+  display: block !important;
+}
+.mobile .video-page-container.tab-chat #videoChaptersPanel,
+.app.mobile .video-page-container.tab-chat #videoChaptersPanel,
+[data-device="phone"] .video-page-container.tab-chat #videoChaptersPanel,
+.mobile .video-page-container.tab-chat #videoSummaryPanel,
+.app.mobile .video-page-container.tab-chat #videoSummaryPanel,
+[data-device="phone"] .video-page-container.tab-chat #videoSummaryPanel {
+  display: none !important;
+}
+
+.mobile .video-page-container.tab-summary #videoSummaryPanel,
+.app.mobile .video-page-container.tab-summary #videoSummaryPanel,
+[data-device="phone"] .video-page-container.tab-summary #videoSummaryPanel {
+  display: block !important;
+}
+.mobile .video-page-container.tab-summary #videoChaptersPanel,
+.app.mobile .video-page-container.tab-summary #videoChaptersPanel,
+[data-device="phone"] .video-page-container.tab-summary #videoChaptersPanel,
+.mobile .video-page-container.tab-summary #videoAiPanel,
+.app.mobile .video-page-container.tab-summary #videoAiPanel,
+[data-device="phone"] .video-page-container.tab-summary #videoAiPanel {
+  display: none !important;
+}
+
+
+
+

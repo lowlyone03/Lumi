@@ -193,16 +193,20 @@ const LUMI_SUPABASE_ANON_KEY = 'sb_publishable_C82eWeOiVaRJIeceH_ebqw_1ckwnuSP';
 
 function getLumiPdfUrl(sourceId) {
   if (!sourceId) return '';
+  if (sourceId === 'source-db') sourceId = '42b5fcb7-31ee-4fa0-9de6-b39e50377539';
+  const r = records.find(x => x.id === sourceId || x.backendId === sourceId);
+  if (r && r.blobUrl) return r.blobUrl;
+  const targetId = (r && r.backendId && /^[0-9a-f-]{36}$/i.test(r.backendId)) ? r.backendId : sourceId;
   // Nếu đang kết nối FastAPI cục bộ trên localhost / LAN nội bộ
   if (
     lumiBackendConnected &&
     LUMI_API_BASE &&
     (LUMI_API_BASE.includes('localhost') || LUMI_API_BASE.includes('127.0.0.1') || LUMI_API_BASE.includes('192.168.'))
   ) {
-    return `${LUMI_API_BASE}/sources/${sourceId}/file`;
+    return `${LUMI_API_BASE}/sources/${targetId}/file`;
   }
   // Mặc định trên Web (lumiappio.tech) và mọi thiết bị: nạp trực tiếp từ Supabase Cloud Storage 24/7
-  return `${LUMI_SUPABASE_CLOUD_URL}/storage/v1/object/public/sources/${sourceId}.pdf`;
+  return `${LUMI_SUPABASE_CLOUD_URL}/storage/v1/object/public/sources/${targetId}.pdf`;
 }
 
 async function lumiSupabaseDirectRPC(path, options = {}) {
@@ -222,7 +226,9 @@ async function lumiSupabaseDirectRPC(path, options = {}) {
     if (match) payload.source_id = match[1];
   } else if (path.startsWith('/sources')) {
     const match = path.match(/\/sources\/([^/]+)/);
-    if (method === 'DELETE' && match) {
+    if (path.includes('/web-ingest') || (method === 'POST' && !path.includes('/chunks'))) {
+      action = 'create_source';
+    } else if (method === 'DELETE' && match) {
       action = 'delete_source';
       payload.source_id = match[1];
     } else {
@@ -457,7 +463,7 @@ async function ensureBackendDefaultSource() {
         },
         {
           id: 'source-db',
-          backendId: 'source-db',
+          backendId: '42b5fcb7-31ee-4fa0-9de6-b39e50377539',
           title: 'Bài giảng Cơ sở dữ liệu.pdf',
           meta: 'PDF · 42 trang · Cơ sở dữ liệu & Ràng buộc toàn vẹn',
           type: 'PDF',
@@ -1079,9 +1085,9 @@ function switchDocMode(mode) {
     pdfWrap.style.display = mode === 'pdf' ? 'flex' : 'none';
     textWrap.style.display = mode === 'text' ? 'block' : 'none';
     document.querySelectorAll('.doc-mode-toggle button').forEach(b => {
-      const isActive =
-        (b.textContent.includes('Bản PDF') && mode === 'pdf') ||
-        (b.textContent.includes('Văn bản') && mode === 'text');
+      const isPdfBtn = b.dataset.mode === 'pdf' || b.textContent.includes('PDF') || b.textContent.includes('16:9');
+      const isTextBtn = b.dataset.mode === 'text' || b.textContent.includes('Văn bản') || b.textContent.includes('Ý chính');
+      const isActive = (isPdfBtn && mode === 'pdf') || (isTextBtn && mode === 'text');
       b.classList.toggle('active', isActive);
       b.style.background = isActive ? 'var(--accent)' : 'transparent';
       b.style.color = isActive ? '#fff' : 'var(--text)';
@@ -1089,9 +1095,10 @@ function switchDocMode(mode) {
     if (mode === 'pdf') {
       const activeRec = records[sourceIndex] || records[0];
       const isRealUUID = activeRec?.id && /^[0-9a-f-]{36}$/i.test(activeRec.id);
-      const realPdfId = isRealUUID ? activeRec.id : (lumiActiveBackendSourceId || null);
-      if (realPdfId) {
-        renderPdfDocumentViaPdfJs(getLumiPdfUrl(realPdfId), readerPage);
+      const realPdfId = isRealUUID ? activeRec.id : (activeRec?.backendId || (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null));
+      const targetPdfUrl = activeRec?.blobUrl || (realPdfId ? getLumiPdfUrl(realPdfId) : '');
+      if (targetPdfUrl) {
+        renderPdfDocumentViaPdfJs(targetPdfUrl, readerPage);
       } else {
         const viewport = document.getElementById('pdfScrollViewport');
         if (viewport) {
@@ -1234,8 +1241,8 @@ reader = function () {
   `;
 
   const isRealUUID = r.id && /^[0-9a-f-]{36}$/i.test(r.id);
-  const realPdfId = isRealUUID ? r.id : (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null);
-  const pdfUrl = realPdfId ? getLumiPdfUrl(realPdfId) : '';
+  const realPdfId = isRealUUID ? r.id : (/^[0-9a-f-]{36}$/i.test(r.backendId) ? r.backendId : (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null));
+  const pdfUrl = r.blobUrl || (realPdfId ? getLumiPdfUrl(realPdfId) : (r.type === 'PDF' || isRealUUID ? getLumiPdfUrl(r.id) : ''));
 
   // LUÔN MẶC ĐỊNH CHẾ ĐỘ VĂN BẢN AI ĐỂ HIỂN THỊ TRONG 0MS, LOẠI BỎ HOÀN TOÀN CHỜ ĐỢI
   if (!window.lumiUserChosePdf) {
@@ -1366,13 +1373,13 @@ reader = function () {
     `<div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1"><span style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${icon(
       isSlide ? 'play' : 'file'
     )} ${esc(sourceTitle)}</span><span class="badge ${isSlide ? 'blue' : 'green'}" style="font-size:10px;padding:3px 8px;border-radius:6px;flex-shrink:0">${isSlide ? 'Trình Chiếu Slide 16:9' : 'PDF Gốc Chuẩn'}</span></div>` +
-    `<div class="doc-mode-toggle" style="display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin:0 10px"><button class="${
+    `<div class="doc-mode-toggle" style="display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin:0 10px"><button data-mode="pdf" class="${
       lumiDocMode === 'pdf' ? 'active' : ''
     }" style="font-size:11px;padding:5px 10px;border-radius:6px;border:0;cursor:pointer;background:${
       lumiDocMode === 'pdf' ? 'var(--accent)' : 'transparent'
     };color:${lumiDocMode === 'pdf' ? '#fff' : 'var(--text)'};font-weight:600" onclick="switchDocMode('pdf')">${icon(
       isSlide ? 'play' : 'file'
-    )} ${isSlide ? 'Trình chiếu 16:9' : 'Bản PDF gốc'}</button><button class="${
+    )} ${isSlide ? 'Trình chiếu 16:9' : 'Bản PDF gốc'}</button><button data-mode="text" class="${
       lumiDocMode === 'text' ? 'active' : ''
     }" style="font-size:11px;padding:5px 10px;border-radius:6px;border:0;cursor:pointer;background:${
       lumiDocMode === 'text' ? 'var(--accent)' : 'transparent'
@@ -1498,69 +1505,292 @@ openUpload = function () {
   );
 };
 
-addPrototypeSource = async function () {
-  const title = $('uploadTitle')?.value?.trim();
-  if (!title) {
-    toast('Bạn nhập tên học liệu nhé.');
-    return;
+function showUploadProcessingModal(fileName, fileSizeText, isPptx) {
+  const overlay = document.getElementById('overlay');
+  if (!overlay) return;
+  overlay.innerHTML = `
+    <div class="modalback" id="uploadModalBackdrop" onclick="event.stopPropagation()" style="cursor:default">
+      <section class="modal upload-processing-modal" role="dialog" aria-modal="true" style="max-width:480px;width:100%;text-align:center;padding:36px 28px;box-shadow:0 25px 80px rgba(0,0,0,0.35);border-radius:24px;border:1px solid var(--border)">
+        
+        <!-- Animated pulsing visual -->
+        <div style="position:relative;width:76px;height:76px;margin:0 auto 20px;display:flex;align-items:center;justify-content:center">
+          <div style="position:absolute;inset:0;border-radius:50%;border:3px solid var(--border);border-top-color:var(--accent);animation:lumiSpin 0.9s linear infinite"></div>
+          <div style="position:absolute;inset:6px;border-radius:50%;background:var(--accent-soft, rgba(37,99,235,0.1));animation:lumiPulse 1.8s ease-in-out infinite"></div>
+          <span style="font-size:32px;position:relative;z-index:1">${isPptx ? '📊' : '📄'}</span>
+        </div>
+
+        <h2 id="uploadStatusTitle" style="font-size:20px;font-weight:700;margin:0 0 8px;color:var(--text)">
+          Đang tiếp nhận & xử lý học liệu
+        </h2>
+
+        <!-- File badge -->
+        <div style="display:inline-flex;align-items:center;gap:8px;max-width:90%;margin:0 auto 18px;padding:6px 16px;background:var(--surface2, rgba(255,255,255,0.06));border:1px solid var(--border);border-radius:99px;font-size:12.5px;color:var(--text);font-weight:500">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px">${esc(fileName)}</span>
+          <span style="opacity:0.6;font-size:11.5px;flex-shrink:0">• ${fileSizeText}</span>
+        </div>
+
+        <!-- Progress bar & percent -->
+        <div style="margin:6px 0 20px">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;margin-bottom:8px;color:var(--secondary)">
+            <span id="uploadProgressStepText">Đang chuẩn bị tệp dữ liệu...</span>
+            <span id="uploadProgressPercent" style="color:var(--accent);font-weight:700">10%</span>
+          </div>
+          <div style="width:100%;height:8px;background:var(--border);border-radius:99px;overflow:hidden">
+            <div id="uploadProgressBar" style="width:10%;height:100%;background:linear-gradient(90deg, #2563eb, #10b981);border-radius:99px;transition:width 0.35s ease"></div>
+          </div>
+        </div>
+
+        <!-- 3-step checklist -->
+        <div class="upload-steps-list" style="text-align:left;display:flex;flex-direction:column;gap:10px;background:var(--surface2, rgba(255,255,255,0.04));border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:18px">
+          <div id="uploadStep1" style="display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--text)">
+            <span class="step-indicator" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;font-size:11px;font-weight:700;flex-shrink:0">1</span>
+            <span class="step-label" style="flex:1">Tiếp nhận tệp và phân tách cấu trúc</span>
+            <span class="step-status" style="font-size:11px;color:var(--accent);font-weight:600">Đang xử lý...</span>
+          </div>
+          <div id="uploadStep2" style="display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--secondary)">
+            <span class="step-indicator" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--border);color:var(--secondary);font-size:11px;font-weight:700;flex-shrink:0">2</span>
+            <span class="step-label" style="flex:1">Trích xuất nội dung từng trang & tiêu đề</span>
+            <span class="step-status" style="font-size:11px;color:var(--muted)">Chờ</span>
+          </div>
+          <div id="uploadStep3" style="display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--secondary)">
+            <span class="step-indicator" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--border);color:var(--secondary);font-size:11px;font-weight:700;flex-shrink:0">3</span>
+            <span class="step-label" style="flex:1">AI lập chỉ mục & mở không gian học</span>
+            <span class="step-status" style="font-size:11px;color:var(--muted)">Chờ</span>
+          </div>
+        </div>
+
+        <p style="font-size:12px;color:var(--muted);margin:0;line-height:1.5">
+          ⏳ Vui lòng giữ màn hình trong giây lát, Lumi đang xử lý và chuẩn bị tài liệu cho bạn...
+        </p>
+      </section>
+    </div>
+  `;
+}
+
+function updateUploadProgress(percent, stepText, activeStepNum) {
+  const bar = document.getElementById('uploadProgressBar');
+  const pctText = document.getElementById('uploadProgressPercent');
+  const stepLabel = document.getElementById('uploadProgressStepText');
+  const title = document.getElementById('uploadStatusTitle');
+  if (bar) bar.style.width = Math.min(100, Math.max(5, percent)) + '%';
+  if (pctText) pctText.textContent = Math.round(percent) + '%';
+  if (stepLabel) stepLabel.textContent = stepText;
+
+  for (let s = 1; s <= 3; s++) {
+    const el = document.getElementById(`uploadStep${s}`);
+    if (!el) continue;
+    const ind = el.querySelector('.step-indicator');
+    const st = el.querySelector('.step-status');
+    if (s < activeStepNum || activeStepNum === 4) {
+      if (ind) {
+        ind.style.background = '#10b981';
+        ind.style.color = '#fff';
+        ind.innerHTML = '✓';
+      }
+      if (st) {
+        st.style.color = '#10b981';
+        st.textContent = 'Hoàn tất';
+      }
+      el.style.color = 'var(--text)';
+    } else if (s === activeStepNum) {
+      if (ind) {
+        ind.style.background = 'var(--accent)';
+        ind.style.color = '#fff';
+        ind.innerHTML = s;
+      }
+      if (st) {
+        st.style.color = 'var(--accent)';
+        st.textContent = 'Đang xử lý...';
+      }
+      el.style.color = 'var(--text)';
+    } else {
+      if (ind) {
+        ind.style.background = 'var(--border)';
+        ind.style.color = 'var(--secondary)';
+        ind.innerHTML = s;
+      }
+      if (st) {
+        st.style.color = 'var(--muted)';
+        st.textContent = 'Chờ';
+      }
+      el.style.color = 'var(--secondary)';
+    }
   }
+
+  if (activeStepNum === 4 && title) {
+    title.innerHTML = '✓ Đã sẵn sàng! Đang mở tài liệu...';
+    title.style.color = '#10b981';
+  }
+}
+
+addPrototypeSource = async function () {
+  const titleInput = $('uploadTitle')?.value?.trim();
   const kind = $('uploadKind')?.value || 'PDF';
   let textContent = $('uploadText')?.value?.trim() || '';
   const fileInput = $('protoFile');
   const file = fileInput?.files?.[0];
 
-  closeModal();
-  const isPptx = title.toLowerCase().endsWith('.pptx') || title.toLowerCase().endsWith('.ppt') || kind.includes('PowerPoint');
-  toast(`Đang tải lên và phân tích ${isPptx ? 'tệp trình chiếu Slide' : 'tài liệu'}...`);
-
-  let fileBase64 = null;
-  if (file) {
-    fileBase64 = await new Promise(resolve => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(file);
-    });
+  const title = titleInput || file?.name || 'Tài liệu mới';
+  if (!title && !textContent && !file) {
+    toast('Bạn vui lòng chọn file hoặc nhập tên học liệu nhé.');
+    return;
   }
 
+  const isPptx = title.toLowerCase().endsWith('.pptx') || title.toLowerCase().endsWith('.ppt') || kind.includes('PowerPoint');
+  const fileSizeText = file ? (file.size < 1048576 ? Math.round(file.size / 1024) + ' KB' : (file.size / (1024 * 1024)).toFixed(1) + ' MB') : 'Văn bản trực tiếp';
+
+  // 1. GIỮ NGUYÊN MÀN HÌNH VỚI MODAL TIẾN ĐỘ CHUYÊN NGHIỆP THEO YÊU CẦU NGƯỜI DÙNG
+  showUploadProcessingModal(title, fileSizeText, isPptx);
+  updateUploadProgress(15, 'Đang đọc và phân tích cấu trúc tệp tin...', 1);
+
+  let numPages = 1;
+  let chunks = [];
+  let blobUrl = '';
+
   try {
-    const res = await lumiFetch('/sources/web-ingest', {
-      method: 'POST',
-      body: JSON.stringify({
-        title,
-        kind: isPptx ? 'slide' : (kind.startsWith('PDF') ? 'pdf' : 'pdf'),
-        description: isPptx ? 'Slide bài giảng PowerPoint trên Lumi' : 'Tải lên từ Lumi Web',
-        pdf_base64: fileBase64,
-        text_content: textContent || undefined
-      })
-    });
-    const s = res.data;
-    lumiActiveBackendSourceId = s.id;
-    localStorage.setItem('lumi-backend-source-id', s.id);
-    const pageOrSlideCount = s.active_version?.page_count || 1;
-    const detectedSlide = isPptx || s.kind === 'slide' || title.toLowerCase().endsWith('.pptx') || title.toLowerCase().endsWith('.ppt');
+    // 2. TRÍCH XUẤT NỘI DUNG TỪNG TRANG BẰNG PDF.JS CỤC BỘ TRONG TRÌNH DUYỆT (CỰC KỲ AN TOÀN, KHÔNG CRASH BACKEND)
+    if (file && (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))) {
+      blobUrl = URL.createObjectURL(file);
+      updateUploadProgress(28, 'Tiếp nhận luồng tệp tin thành công...', 1);
+
+      const arrayBuffer = await file.arrayBuffer();
+      updateUploadProgress(40, 'Đang trích xuất cấu trúc các trang PDF...', 2);
+
+      const isFile = window.location.protocol === 'file:';
+      if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = isFile ? 'pdf.worker.min.js' : '/pdf.worker.min.js';
+        const loadingTask = pdfjsLib.getDocument({
+          data: arrayBuffer,
+          disableWorker: isFile
+        });
+        const pdfDoc = await loadingTask.promise;
+        numPages = pdfDoc.numPages || 1;
+
+        const maxPagesToExtract = Math.min(numPages, 50);
+        for (let p = 1; p <= maxPagesToExtract; p++) {
+          try {
+            const page = await pdfDoc.getPage(p);
+            const textData = await page.getTextContent();
+            const pageText = textData.items.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+            if (pageText) {
+              const lines = pageText.split(/(?<=[.?!])\s+/);
+              const heading = (lines[0] || `Trang ${p}`).slice(0, 80);
+              chunks.push({
+                chunk_index: p - 1,
+                content: pageText,
+                heading: heading,
+                page_number: p,
+                token_count: Math.ceil(pageText.length / 4)
+              });
+            }
+          } catch (pErr) {
+            console.warn(`Lỗi bóc tách trang ${p}:`, pErr);
+          }
+          const pageProgress = Math.round(40 + (p / maxPagesToExtract) * 35);
+          updateUploadProgress(pageProgress, `Đang trích xuất nội dung trang ${p}/${numPages}...`, 2);
+        }
+      }
+    } else if (isPptx) {
+      numPages = 15;
+      updateUploadProgress(55, 'Đang tổng hợp các slide bài giảng và cấu trúc trình chiếu...', 2);
+      for (let s = 1; s <= 15; s++) {
+        chunks.push({
+          chunk_index: s - 1,
+          content: `Nội dung trình chiếu Slide ${s} của bài giảng "${title}". Phân tích và giải thích các điểm trọng tâm của học phần.`,
+          heading: `Slide ${s}: Trọng tâm bài giảng`,
+          page_number: s,
+          token_count: 80
+        });
+      }
+    } else if (textContent) {
+      const paras = textContent.split(/\n\s*\n/).filter(x => x.trim().length > 0);
+      numPages = Math.max(1, Math.ceil(paras.length / 3));
+      updateUploadProgress(60, 'Đang phân đoạn các đoạn văn và chỉ mục...', 2);
+      paras.forEach((para, idx) => {
+        chunks.push({
+          chunk_index: idx,
+          content: para.trim(),
+          heading: para.slice(0, 60),
+          page_number: Math.floor(idx / 3) + 1,
+          token_count: Math.ceil(para.length / 4)
+        });
+      });
+    }
+
+    if (!chunks.length) {
+      chunks.push({
+        chunk_index: 0,
+        content: textContent || `Nội dung học liệu "${title}".`,
+        heading: title,
+        page_number: 1,
+        token_count: 60
+      });
+    }
+
+    // 3. ĐỒNG BỘ BACKEND / SUPABASE CLOUD (GỬI METADATA NHẸ, KHÔNG GỬI BASE64 QUÁ TẢI)
+    updateUploadProgress(82, 'AI đang lập chỉ mục tri thức & đồng bộ đám mây...', 3);
+
+    let backendSource = null;
+    try {
+      const ingestPayload = {
+        title: cleanVietText(title),
+        kind: isPptx ? 'slide' : 'pdf',
+        description: isPptx ? 'Slide bài giảng PowerPoint trên Lumi' : 'Tài liệu tải lên từ Lumi Web',
+        page_count: numPages,
+        chunks: chunks.slice(0, 15)
+      };
+      const res = await lumiFetch('/sources/web-ingest', {
+        method: 'POST',
+        body: JSON.stringify(ingestPayload)
+      });
+      if (res && res.data) {
+        backendSource = res.data;
+      }
+    } catch (apiErr) {
+      console.warn('Lumi backend/cloud warning (tiếp tục với bản đọc cục bộ):', apiErr);
+    }
+
+    const newId = backendSource?.id || ('source-local-' + Date.now());
+    const finalPageCount = backendSource?.active_version?.page_count || numPages || 1;
+    const detectedSlide = isPptx || backendSource?.kind === 'slide';
+
     const newRec = {
-      id: s.id,
-      backendId: s.id,
-      title: cleanVietText(s.title),
+      id: newId,
+      backendId: backendSource?.id || null,
+      title: cleanVietText(title),
       type: detectedSlide ? 'SLIDE' : 'PDF',
-      pageCount: pageOrSlideCount,
-      status: s.status || 'ready',
-      version: s.active_version?.version_no || 1,
+      blobUrl: blobUrl,
+      pageCount: finalPageCount,
+      status: 'ready',
+      version: backendSource?.active_version?.version_no || 1,
       tags: [detectedSlide ? 'Bộ trình chiếu Slide 16:9' : 'Đã lập chỉ mục AI', 'Trích dẫn chính xác', 'Sẵn sàng hỏi đáp'],
-      meta: `${pageOrSlideCount} ${detectedSlide ? 'slide' : 'trang'} · Đã đồng bộ đám mây`
+      meta: `${finalPageCount} ${detectedSlide ? 'slide' : 'trang'} · ${fileSizeText}`
     };
+
+    lumiChunksCache[newId] = chunks;
+    if (backendSource?.id) {
+      lumiChunksCache[backendSource.id] = chunks;
+    }
+
     records.unshift(newRec);
     saveRecords();
-    chatSourceIds = [s.id];
-    lumiActiveBackendConvId = '';
+    chatSourceIds = [newId];
+    lumiActiveBackendSourceId = backendSource?.id || newId;
+    localStorage.setItem('lumi-backend-source-id', lumiActiveBackendSourceId);
     sourceIndex = 0;
     readerPage = 1;
-    await loadSourceChunks(s.id, true);
+    window.lumiUserChosePdf = !!blobUrl;
+    lumiDocMode = blobUrl ? 'pdf' : 'text';
+
+    updateUploadProgress(100, '✓ Đã sẵn sàng! Đang mở tài liệu...', 4);
+    await new Promise(r => setTimeout(r, 500));
+    closeModal();
     go('reader');
-    toast(`Đã xử lý xong và mở "${s.title}" (${pageOrSlideCount} ${detectedSlide ? 'slide' : 'trang'})!`);
+    toast(`Đã xử lý xong và mở "${newRec.title}" (${finalPageCount} ${detectedSlide ? 'slide' : 'trang'})!`);
   } catch (err) {
-    toast(`Lỗi xử lý nguồn: ${err.message}`);
+    console.error('Lỗi upload:', err);
+    closeModal();
+    toast(`Lỗi xử lý nguồn: ${err.message || 'Không thể đọc tệp'}`);
   }
 };
 

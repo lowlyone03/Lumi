@@ -108,6 +108,8 @@ class WebIngestRequest(BaseModel):
     description: Optional[str] = Field(default=None, max_length=2000)
     pdf_base64: Optional[str] = Field(default=None, description="Nội dung file PDF mã hóa Base64")
     text_content: Optional[str] = Field(default=None, description="Nội dung văn bản nếu tạo từ ghi chú/link")
+    page_count: Optional[int] = Field(default=None, description="Số trang tài liệu")
+    chunks: Optional[List[Dict[str, Any]]] = Field(default=None, description="Danh sách các đoạn văn đã bóc tách")
 
 
 class SourceUpdateRequest(BaseModel):

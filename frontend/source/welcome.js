@@ -63,7 +63,16 @@ render=function(){
   previousLumiRender();
   updateLumiProfile()
 };
-function updateLumiProfile(){const avatarText=userProfile.name.split(' ').filter(Boolean).slice(-2).map(x=>x[0]).join('').toUpperCase();document.querySelectorAll('.profile>span:nth-child(2)>strong').forEach(x=>x.textContent=userProfile.name);document.querySelectorAll('.profile .avatar,.topright>.avatar').forEach(x=>x.textContent=avatarText||'L')}
+function updateLumiProfile(){
+  const name = (userProfile && userProfile.name) ? userProfile.name : 'Nguyễn Văn An';
+  const avatarText = name.split(' ').filter(Boolean).slice(-2).map(x=>x[0]).join('').toUpperCase() || 'NA';
+  document.querySelectorAll('.profile>span:nth-child(2)>strong').forEach(x=>x.textContent=name);
+  document.querySelectorAll('.profile .avatar,.topright>.avatar').forEach(x=>x.textContent=avatarText);
+}
+try { updateLumiProfile(); } catch(e){}
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', updateLumiProfile);
+}
 go=function(p){
   if(p==='landing'){page='landing';lumiGuestMenu=false}
   else if(p==='auth'){page='auth'}
@@ -85,6 +94,7 @@ go=function(p){
     }
   }
   if($('crumb'))$('crumb').textContent=names[page]||'Lumi';
+  const m=$('main');if(m)m.scrollTop=0;
   render();
   window.scrollTo({top:0,behavior:'instant'})
 };

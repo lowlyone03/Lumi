@@ -668,7 +668,13 @@ svg{
   gap:6px;
   border-bottom:1px solid var(--line);
   margin-bottom:22px;
-  overflow:auto}
+  overflow:auto;
+  scrollbar-width:none;
+  -ms-overflow-style:none}
+.tabs::-webkit-scrollbar{
+  display:none;
+  width:0;
+  height:0}
 .tabs button{
   padding:12px 15px;
   white-space:nowrap;

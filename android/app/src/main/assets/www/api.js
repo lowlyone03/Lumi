@@ -3452,7 +3452,7 @@ hub = function () {
     `<button class="p-spotlight ai" onclick="openAskSource('${currentSrc ? (currentSrc.id || '') : ''}')">${toneIcon('spark', 'green')}<span><small>${badgeLabel} · ${typeBadge}</small><strong>${currentSrc ? esc(currentSrc.title) : 'Điều gì đang làm bạn tò mò?'}</strong><p>${currentSrc ? 'Hỏi trợ giảng AI về học liệu này, tra cứu định nghĩa, đối chiếu trích dẫn chính xác.' : 'Hỏi từ tài liệu, hiểu bằng ví dụ.'}</p></span><span class="p-round-arrow">${icon('arrow')}</span></button>` +
     `<button class="p-spotlight review" onclick="openSmartPracticeModal('${currentSrc ? (currentSrc.id || '') : ''}')">${toneIcon('quiz', 'purple')}<span><small>${badgeLabel} · ${typeBadge}</small><strong>Ôn tập & Luyện trắc nghiệm AI</strong><p>${currentSrc ? 'Sinh đề kiểm tra & Flashcard SM-2 từ: ' + esc(currentSrc.title.slice(0, 36)) + (currentSrc.title.length > 36 ? '...' : '') : 'Sinh trắc nghiệm AI & Flashcard từ học liệu đang học.'}</p></span><span class="p-round-arrow">${icon('arrow')}</span></button>` +
     `</div>` +
-    `<div class="p-discovery-bar"><div><h2>Khám phá công cụ</h2><p>Chọn điều hữu ích cho buổi học hôm nay.</p></div><form class="p-search" onsubmit="event.preventDefault()">${icon('search')}<input id="toolSearch" value="${esc(toolQuery)}" aria-label="Tìm chức năng" placeholder="Tìm một công cụ..." oninput="toolQuery=this.value;document.getElementById('toolsResults').innerHTML=toolsResults()"><span>${featureGroups.reduce((n, g) => n + g[1].length, 0)}</span></form></div><nav class="p-category-tabs" aria-label="Nhóm chức năng">${[['Tất cả', -1], ['Bắt đầu', 0], ['Học & hỏi', 1], ['Luyện & ôn', 2], ['Tổ chức', 3]].map(([t, i]) => `<button class="${toolCategory === i ? 'active' : ''}" aria-pressed="${toolCategory === i}" onclick="toolCategory=${i};render()">${t}</button>`).join('')}</nav><div id="toolsResults">${toolsResults()}</div><div class="p-quiet-foot">${icon('sprout')}Không cần dùng tất cả. Chỉ chọn điều hợp với bạn hôm nay.</div>`
+    `<div class="p-discovery-bar"><div><h2>Khám phá công cụ</h2><p>Chọn điều hữu ích cho buổi học hôm nay.</p></div><form class="p-search" onsubmit="event.preventDefault()">${icon('search')}<input id="toolSearch" value="${esc(toolQuery)}" aria-label="Tìm chức năng" placeholder="Tìm một công cụ..." oninput="toolQuery=this.value;document.getElementById('toolsResults').innerHTML=toolsResults()"><span>${featureGroups.reduce((n, g) => n + g[1].length, 0)}</span></form></div><nav class="p-category-tabs" aria-label="Nhóm chức năng">${[['Tất cả', -1], ['Bắt đầu', 0], ['Học & hỏi', 1], ['Luyện & ôn', 2], ['Tổ chức', 3], ['Giới thiệu', 4]].map(([t, i]) => `<button class="${toolCategory === i ? 'active' : ''}" aria-pressed="${toolCategory === i}" onclick="toolCategory=${i};render()">${t}</button>`).join('')}</nav><div id="toolsResults">${toolsResults()}</div><div class="p-quiet-foot">${icon('sprout')}Không cần dùng tất cả. Chỉ chọn điều hợp với bạn hôm nay.</div>`
   );
 };
 
@@ -4088,7 +4088,14 @@ render = function () {
     lesson: typeof lessonPage === 'function' ? lessonPage : course
   };
   $('app').dataset.page = page;
-  $('main').innerHTML = (views[page] || hub)();
+  try {
+    $('main').innerHTML = (views[page] || hub)();
+  } catch (renderErr) {
+    console.error('Lumi render error for page "' + page + '":', renderErr);
+    try {
+      $('main').innerHTML = `<div class="empty"><h3>Không thể tải giao diện trang này</h3><p>${esc(String(renderErr?.message || renderErr))}</p><div class="actionline"><button class="btn" onclick="go('home')">Về trang chủ</button><button class="btn secondary" onclick="location.reload()">Tải lại trang</button></div></div>`;
+    } catch (e) {}
+  }
   hydrate();
   const group = ['reader', 'course', 'quiz', 'source', 'video', 'notes', 'history', 'lesson'].includes(page)
     ? 'library'

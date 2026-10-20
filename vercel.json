@@ -98,5 +98,12 @@
       "source": "/(.*)",
       "destination": "/frontend/source/$1"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/api/v1/sources/:sourceId/file",
+      "destination": "https://baenwfcstfywrbanweks.supabase.co/storage/v1/object/public/sources/:sourceId.pdf",
+      "permanent": false
+    }
   ]
 }

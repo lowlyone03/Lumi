@@ -158,11 +158,15 @@ const LUMI_SUPABASE_ANON_KEY = 'sb_publishable_C82eWeOiVaRJIeceH_ebqw_1ckwnuSP';
 
 function getLumiPdfUrl(sourceId) {
   if (!sourceId) return '';
-  // Nếu máy tính đang bật và kết nối qua FastAPI nội bộ
-  if (lumiBackendConnected && LUMI_API_BASE && !LUMI_API_BASE.includes('trycloudflare.com')) {
+  // Nếu đang kết nối FastAPI cục bộ trên localhost / LAN nội bộ
+  if (
+    lumiBackendConnected &&
+    LUMI_API_BASE &&
+    (LUMI_API_BASE.includes('localhost') || LUMI_API_BASE.includes('127.0.0.1') || LUMI_API_BASE.includes('192.168.'))
+  ) {
     return `${LUMI_API_BASE}/sources/${sourceId}/file`;
   }
-  // Mặc định nạp trực tiếp từ Supabase Cloud Storage 24/7 (kể cả khi tắt máy tính)
+  // Mặc định trên Web (lumiappio.tech) và mọi thiết bị: nạp trực tiếp từ Supabase Cloud Storage 24/7
   return `${LUMI_SUPABASE_CLOUD_URL}/storage/v1/object/public/sources/${sourceId}.pdf`;
 }
 

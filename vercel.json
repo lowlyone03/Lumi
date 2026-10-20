@@ -2,28 +2,101 @@
   "version": 2,
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/", "destination": "/frontend/source/home.html" },
-    { "source": "/home", "destination": "/frontend/source/home.html" },
-    { "source": "/library", "destination": "/frontend/source/library.html" },
-    { "source": "/personal", "destination": "/frontend/source/personal.html" },
-    { "source": "/reader", "destination": "/frontend/source/reader.html" },
-    { "source": "/hub", "destination": "/frontend/source/hub.html" },
-    { "source": "/history", "destination": "/frontend/source/history.html" },
-    { "source": "/review", "destination": "/frontend/source/review.html" },
-    { "source": "/flashcards", "destination": "/frontend/source/flashcards.html" },
-    { "source": "/planner", "destination": "/frontend/source/planner.html" },
-    { "source": "/focus", "destination": "/frontend/source/focus.html" },
-    { "source": "/stats", "destination": "/frontend/source/stats.html" },
-    { "source": "/glossary", "destination": "/frontend/source/glossary.html" },
-    { "source": "/outlines", "destination": "/frontend/source/outlines.html" },
-    { "source": "/auth", "destination": "/frontend/source/auth.html" },
-    { "source": "/login", "destination": "/frontend/source/auth.html" },
-    { "source": "/signup", "destination": "/frontend/source/auth.html" },
-    { "source": "/video", "destination": "/frontend/source/video.html" },
-    { "source": "/source", "destination": "/frontend/source/source.html" },
-    { "source": "/notes", "destination": "/frontend/source/notes.html" },
-    { "source": "/course", "destination": "/frontend/source/course.html" },
-    { "source": "/quiz", "destination": "/frontend/source/quiz.html" },
-    { "source": "/(.*)", "destination": "/frontend/source/$1" }
+    {
+      "source": "/api/v1/sources/:sourceId/file",
+      "destination": "https://baenwfcstfywrbanweks.supabase.co/storage/v1/object/public/sources/:sourceId.pdf"
+    },
+    {
+      "source": "/",
+      "destination": "/frontend/source/home.html"
+    },
+    {
+      "source": "/home",
+      "destination": "/frontend/source/home.html"
+    },
+    {
+      "source": "/library",
+      "destination": "/frontend/source/library.html"
+    },
+    {
+      "source": "/personal",
+      "destination": "/frontend/source/personal.html"
+    },
+    {
+      "source": "/reader",
+      "destination": "/frontend/source/reader.html"
+    },
+    {
+      "source": "/hub",
+      "destination": "/frontend/source/hub.html"
+    },
+    {
+      "source": "/history",
+      "destination": "/frontend/source/history.html"
+    },
+    {
+      "source": "/review",
+      "destination": "/frontend/source/review.html"
+    },
+    {
+      "source": "/flashcards",
+      "destination": "/frontend/source/flashcards.html"
+    },
+    {
+      "source": "/planner",
+      "destination": "/frontend/source/planner.html"
+    },
+    {
+      "source": "/focus",
+      "destination": "/frontend/source/focus.html"
+    },
+    {
+      "source": "/stats",
+      "destination": "/frontend/source/stats.html"
+    },
+    {
+      "source": "/glossary",
+      "destination": "/frontend/source/glossary.html"
+    },
+    {
+      "source": "/outlines",
+      "destination": "/frontend/source/outlines.html"
+    },
+    {
+      "source": "/auth",
+      "destination": "/frontend/source/auth.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/frontend/source/auth.html"
+    },
+    {
+      "source": "/signup",
+      "destination": "/frontend/source/auth.html"
+    },
+    {
+      "source": "/video",
+      "destination": "/frontend/source/video.html"
+    },
+    {
+      "source": "/source",
+      "destination": "/frontend/source/source.html"
+    },
+    {
+      "source": "/notes",
+      "destination": "/frontend/source/notes.html"
+    },
+    {
+      "source": "/course",
+      "destination": "/frontend/source/course.html"
+    },
+    {
+      "source": "/quiz",
+      "destination": "/frontend/source/quiz.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/frontend/source/$1"
+    }
   ]
 }

@@ -39,7 +39,7 @@ html[data-device="phone"] .mobile.app{
   min-height:100dvh;
 }
 
-html[data-device="phone"] .sidebar{height:100vh;height:100dvh}
+html[data-device="phone"] .sidebar{display:none!important}
 
 /* Màn chào app mobile và màn đăng nhập/đăng ký mobile */
 html[data-device="phone"] .mobile-preview-stage,

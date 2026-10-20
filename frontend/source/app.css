@@ -1045,8 +1045,10 @@ svg{
   border-radius:24px;
   overflow:hidden;
   box-shadow:0 8px 55px #1b37231a}
-.mobile .sidebar{
-  display:none}
+.mobile .sidebar,
+.app.mobile .sidebar,
+.mobile.app .sidebar{
+  display:none!important}
 .mobile .topbar{
   height:67px;
   padding:0 19px}
@@ -2260,8 +2262,10 @@ h1,h2,h3{
   min-height:850px;
   overflow:clip;
   display:block}
-.mobile .sidebar{
-  display:none}
+.mobile .sidebar,
+.app.mobile .sidebar,
+.mobile.app .sidebar{
+  display:none!important}
 .mobile .topbar{
   height:75px;
   background:#080a0e;

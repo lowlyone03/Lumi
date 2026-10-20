@@ -14,8 +14,16 @@ html[data-device="phone"] body{
   min-height:100%;
   -webkit-text-size-adjust:100%;
   text-size-adjust:100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   -webkit-tap-highlight-color:transparent;
   overscroll-behavior-y:none;
+}
+
+html[data-device="phone"] canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: auto;
 }
 
 /* Khung ứng dụng: bỏ viền, bo góc, bóng và lề của bản xem thử */

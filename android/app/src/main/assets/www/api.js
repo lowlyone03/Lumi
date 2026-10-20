@@ -857,26 +857,39 @@ async function renderPdfDocumentViaPdfJs(pdfUrl, initialPage = 1) {
 async function renderSinglePdfPage(pdfDoc, pageNum) {
   try {
     const page = await pdfDoc.getPage(pageNum);
-    const canvas = document.getElementById(`pdf-canvas-${pageNum}`);
+    const canvas = document.getElementById(pdf-canvas-);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    const desiredWidth = Math.min(840, window.innerWidth > 900 ? 760 : window.innerWidth - 60);
-    const viewport = page.getViewport({ scale: 1 });
-    const scale = (desiredWidth / viewport.width) * 1.5;
-    const scaledViewport = page.getViewport({ scale });
+    // Tự động tối ưu mật độ điểm ảnh Retina/High-DPI trên điện thoại (DPR 2.5x - 3.0x)
+    // Giúp nét chữ, dấu tiếng Việt và bảng biểu trong PDF nét căng 100%, không bị vỡ hạt
+    const dpr = Math.max(window.devicePixelRatio || 1, 2.5);
+    const viewportBox = document.getElementById('pdfScrollViewport');
+    const containerWidth = viewportBox ? (viewportBox.clientWidth - 20) : (window.innerWidth - 24);
+    const desiredCssWidth = Math.min(840, Math.max(280, containerWidth));
 
-    canvas.width = scaledViewport.width;
-    canvas.height = scaledViewport.height;
-    canvas.style.width = `${scaledViewport.width / 1.5}px`;
-    canvas.style.height = `${scaledViewport.height / 1.5}px`;
+    const baseViewport = page.getViewport({ scale: 1.0 });
+    const cssScale = desiredCssWidth / baseViewport.width;
+    const renderScale = cssScale * dpr;
+    const scaledViewport = page.getViewport({ scale: renderScale });
+
+    // Kích thước bitmap thực tế của Canvas (theo độ phân giải phần cứng màn hình)
+    canvas.width = Math.floor(scaledViewport.width);
+    canvas.height = Math.floor(scaledViewport.height);
+
+    // Kích thước hiển thị CSS
+    canvas.style.width = ${desiredCssWidth}px;
+    canvas.style.height = ${Math.floor(desiredCssWidth * (baseViewport.height / baseViewport.width))}px;
+    canvas.style.display = 'block';
+    canvas.style.margin = '0 auto';
+    canvas.style.borderRadius = '4px';
 
     await page.render({
       canvasContext: ctx,
       viewport: scaledViewport
     }).promise;
   } catch (e) {
-    console.warn(`Lỗi vẽ trang PDF ${pageNum}:`, e);
+    console.warn(Lỗi vẽ trang PDF :, e);
   }
 }
 

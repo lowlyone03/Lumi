@@ -50,7 +50,15 @@ changePage=function(d){readerPage=Math.min(42,Math.max(1,readerPage+d));const r=
 function chooseChatSources(){showModal(`<h2 id="modalTitle">Nguồn cho trợ giảng</h2><p>Chọn một hoặc nhiều nguồn đã sẵn sàng.</p><div class="check-list">${records.filter(r=>!r.deleted&&r.status==='ready').map(r=>`<label><input type="checkbox" name="chatSources" value="${r.id}" ${chatSourceIds.includes(r.id)?'checked':''}><span>${esc(r.title)}</span></label>`).join('')}</div><div class="modalactions">${btn('Hủy','closeModal()',true)}${btn('Áp dụng','applyChatSources()')}</div>`)}
 function applyChatSources(){const ids=[...document.querySelectorAll('input[name="chatSources"]:checked')].map(x=>x.value);if(!ids.length){toast('Bạn chọn ít nhất một nguồn nhé.');return}chatSourceIds=ids;closeModal();readerTab='chat';readingView='assistant';go('reader');toast('Đã chọn '+ids.length+' nguồn cho hội thoại mẫu.')}
 messageHTML=function(m){return `<div class="msg ${m.role}">${m.role==='assistant'?'<span class="label">'+icon('spark')+' LUMI · PHẢN HỒI MẪU</span>':''}${esc(m.text).replace(/\n/g,'<br>')}${m.role==='assistant'?`<div class="actionline compact-actions">${btn('Nguồn · Trang 12',"openCitation()",true,'file')}${btn('Lưu câu trả lời','saveAnswer()',true,'note')}${btn('Báo lỗi',"reportFeedback('answer')",true)}</div>`:''}</div>`};
-function openCitation(){readerTab='chat';readingView='document';readerPage=12;go('reader');toast('Đã mở trang 12 của tài liệu mẫu.')}
+function openCitation(targetPage, ordinal, targetSourceId){
+  if (typeof window.openCitation === 'function' && window.openCitation !== openCitation) {
+    return window.openCitation(targetPage, ordinal, targetSourceId);
+  }
+  readerTab = 'chat';
+  readingView = 'document';
+  readerPage = targetPage || 1;
+  go('reader');
+}
 sendChat=function(value){baseSendChat(value);let q=chatMessages.filter(m=>m.role==='user').at(-1);if(!q)return;if(!activeSession){activeSession=uid();sessions.unshift({id:activeSession,title:q.text.slice(0,55),messages:[],sources:[...chatSourceIds]})}const s=sessions.find(s=>s.id===activeSession);if(s){s.messages=chatMessages.map(m=>({...m}));persist('lumi-chats',sessions)}};
 function historyPage(){return head('Hội thoại của bạn','Mở lại một câu hỏi hoặc bắt đầu cuộc trò chuyện mới.',btn('Hỏi mới','newConversation()',false,'plus'))+(sessions.length?`<div class="stack">${sessions.map(s=>`<div class="settingcard"><h2>${esc(s.title)}</h2><p>${s.messages.length} tin nhắn · ${s.sources.length} nguồn</p><div class="actionline">${btn('Mở',`resumeChat('${s.id}')`)}${btn('Đổi tên',`renameChat('${s.id}')`,true)}${btn('Xóa',`deleteChat('${s.id}')`,true)}</div></div>`).join('')}</div>`:empty('Chưa có cuộc trò chuyện được lưu.',btn('Hỏi điều đầu tiên','newConversation()')))+footer()}
 function newConversation(){activeSession=null;chatMessages=[];readerTab='chat';readingView='assistant';go('reader')}
@@ -100,16 +108,120 @@ function resetFocus(){setFocus(25)}
 function finishFocus(){if(focusTimer)clearInterval(focusTimer);focusRunning=false;let log=saved('lumi-focus-sessions',[]);log.unshift({id:uid(),when:new Date().toLocaleString('vi-VN'),remaining:focusSeconds});persist('lumi-focus-sessions',log);focusSeconds=25*60;go('stats');toast('Đã lưu phiên tập trung trên trình duyệt.')}
 function statsPage(){const logs=saved('lumi-focus-sessions',[]),reviews=saved('lumi-card-reviews',0);return head('Hành trình học của bạn','Số liệu từ thao tác bạn đã thực hiện trong bản giao diện.')+`<div class="stats-grid">${[[completedLessons.length,'Bài đánh dấu hoàn thành'],[attempts.length,'Bài luyện đã nộp'],[reviews,'Lượt ôn thẻ'],[logs.length,'Phiên tập trung']].map(([n,t])=>`<div class="settingcard stat"><strong>${n}</strong><span>${t}</span></div>`).join('')}</div><div class="two-col" style="margin-top:22px"><section class="settingcard"><h2>Lịch sử luyện tập</h2>${attempts.map(a=>`<div class="result-item"><strong>${a.score} / ${a.total} câu đúng</strong><p>${esc(a.when)}</p>${btn('Xem lại',`showAttempt('${a.id}')`,true)}</div>`).join('')||'<p>Chưa có bài luyện được nộp.</p>'}${btn('Luyện tập','quizSetup()',true)}</section><section class="settingcard"><h2>Phiên tập trung</h2>${logs.map(l=>`<p>${esc(l.when)} · Đã lưu</p>`).join('')||'<p>Chưa có phiên tập trung.</p>'}${btn('Bắt đầu một phiên',"go('focus')",true)}<h2 style="margin-top:25px">Gợi ý tiếp theo</h2><p>${saved('sf-review',[]).length?'Bạn có một vài câu đã lưu để ôn.':'Bạn có thể xem tiếp học liệu hoặc thử một bài luyện ngắn.'}</p>${btn('Mở sổ ôn tập',"go('review')",true)}</section></div>`+footer()}
 function showAttempt(id){let a=attempts.find(x=>x.id===id);quizPicked=[...a.picks];score=a.score;quizIndex=questions.length;go('quiz')}
-const terms=[['Khóa chính','Một hoặc nhiều thuộc tính xác định duy nhất mỗi bản ghi. Không chứa NULL.'],['Khóa ngoại','Thuộc tính tham chiếu tới khóa phù hợp trong bảng liên quan.'],['Toàn vẹn tham chiếu','Bảo đảm liên kết giữa các bảng giữ được tính nhất quán.'],['Mô hình quan hệ','Biểu diễn dữ liệu bằng các bảng, hàng và cột.']];
-let termSearch='';
-function glossaryPage(){return head('Thuật ngữ dễ hiểu','Các khái niệm mẫu kèm vị trí trong học liệu.')+`<form class="searchbox glossary-search" onsubmit="event.preventDefault();termSearch=$('termSearch').value;render()">${icon('search')}<input id="termSearch" aria-label="Tìm thuật ngữ" placeholder="Tìm thuật ngữ..." value="${esc(termSearch)}"><button class="textbtn">Tìm</button></form><div class="stack">${terms.filter(([t])=>t.toLowerCase().includes(termSearch.toLowerCase())).map(([t,d])=>`<section class="settingcard"><h2>${t}</h2><p>${d}</p><div class="actionline">${btn('Nguồn · Trang 12','openCitation()',true,'file')}${btn('Hỏi thêm',`askPreset('Giải thích ${t}')`,true)}${btn('Lưu khái niệm',`saveTerm('${t}')`,true)}</div></section>`).join('')||empty('Không tìm thấy thuật ngữ.')}</div>`+footer()}
-function saveTerm(t){const term=terms.find(([x])=>x===t);notebooks.unshift({id:uid(),title:term[0],body:term[1],kind:'note',page:12});saveAllNotes();toast('Đã lưu khái niệm vào ghi chú.')}
+const terms = [
+  {
+    term: 'Khóa chính (Primary Key)',
+    desc: 'Một hoặc nhiều thuộc tính xác định duy nhất mỗi bản ghi trong bảng quan hệ. Tuyệt đối không được phép chứa giá trị NULL.',
+    sourceId: 'source-db',
+    sourceTitle: 'Bài giảng Cơ sở dữ liệu.pdf',
+    page: 12,
+    badge: 'Nguồn: Bài giảng CSDL · Trang 12',
+    icon: 'file'
+  },
+  {
+    term: 'Khóa ngoại (Foreign Key)',
+    desc: 'Thuộc tính trong bảng tham chiếu tới khóa chính của bảng liên quan, giúp duy trì mối quan hệ và bảo đảm toàn vẹn tham chiếu.',
+    sourceId: 'source-db',
+    sourceTitle: 'Bài giảng Cơ sở dữ liệu.pdf',
+    page: 13,
+    badge: 'Nguồn: Bài giảng CSDL · Trang 13',
+    icon: 'file'
+  },
+  {
+    term: 'Toàn vẹn tham chiếu (Referential Integrity)',
+    desc: 'Bảo đảm liên kết giữa các bảng giữ được tính nhất quán: mọi giá trị khóa ngoại phải tham chiếu đến một khóa chính hợp lệ đang tồn tại.',
+    sourceId: 'source-db',
+    sourceTitle: 'Bài giảng Cơ sở dữ liệu.pdf',
+    page: 14,
+    badge: 'Nguồn: Bài giảng CSDL · Trang 14',
+    icon: 'file'
+  },
+  {
+    term: 'Mô hình quan hệ (Relational Model)',
+    desc: 'Biểu diễn dữ liệu bằng các bảng (quan hệ), hàng (bộ/tuple) và cột (thuộc tính), tối ưu hóa lưu trữ và truy vấn SQL.',
+    sourceId: 'source-db',
+    sourceTitle: 'Bài giảng Cơ sở dữ liệu.pdf',
+    page: 10,
+    badge: 'Nguồn: Bài giảng CSDL · Trang 10',
+    icon: 'file'
+  },
+  {
+    term: 'Đề cương thực tập tốt nghiệp',
+    desc: 'Bản kế hoạch thực tập chi tiết bao gồm mục tiêu, đơn vị thực tập, nội dung nghiên cứu và lịch trình làm việc gửi GVHD.',
+    sourceId: 'dfed7ff0-c965-45d4-a24a-7b1277176256',
+    sourceTitle: '03. Tài liệu hướng dẫn thực tập tốt nghiệp ĐH_FBU.pdf',
+    page: 2,
+    badge: 'Nguồn: Tài liệu FBU · Trang 2',
+    icon: 'file'
+  },
+  {
+    term: 'Nhật ký thực tập (Logbook)',
+    desc: 'Sổ theo dõi hoạt động thực tập hàng tuần, ghi chép công việc thực tế tại cơ quan tiếp nhận và ý kiến nhận xét của cán bộ hướng dẫn.',
+    sourceId: 'dfed7ff0-c965-45d4-a24a-7b1277176256',
+    sourceTitle: '03. Tài liệu hướng dẫn thực tập tốt nghiệp ĐH_FBU.pdf',
+    page: 4,
+    badge: 'Nguồn: Tài liệu FBU · Trang 4',
+    icon: 'file'
+  },
+  {
+    term: 'Báo cáo thực tập tốt nghiệp',
+    desc: 'Sản phẩm hoàn chỉnh đúc kết toàn bộ quá trình thực tập, trình bày cơ sở lý thuyết, phân tích hệ thống và kết quả đạt được.',
+    sourceId: 'dfed7ff0-c965-45d4-a24a-7b1277176256',
+    sourceTitle: '03. Tài liệu hướng dẫn thực tập tốt nghiệp ĐH_FBU.pdf',
+    page: 6,
+    badge: 'Nguồn: Tài liệu FBU · Trang 6',
+    icon: 'file'
+  },
+  {
+    term: 'Mô hình mạng OSI (7 tầng)',
+    desc: 'Mô hình chuẩn hóa kết nối mạng chia thành 7 tầng: Vật lý, Liên kết dữ liệu, Mạng, Giao vận, Phiên, Trình diễn và Ứng dụng.',
+    sourceId: 'default-video',
+    sourceTitle: 'Mô hình OSI - Bài giảng video',
+    page: 0,
+    badge: 'Nguồn: Video OSI · Mốc 0:00',
+    icon: 'play'
+  },
+  {
+    term: 'Tầng mạng (Network Layer)',
+    desc: 'Tầng thứ 3 trong mô hình OSI, chịu trách nhiệm định tuyến (routing) gói tin và gán địa chỉ logic (địa chỉ IP).',
+    sourceId: 'default-video',
+    sourceTitle: 'Mô hình OSI - Bài giảng video',
+    page: 125,
+    badge: 'Nguồn: Video OSI · Mốc 2:05',
+    icon: 'play'
+  }
+];
+let termSearch = '';
+function glossaryPage() {
+  return head('Thuật ngữ dễ hiểu', 'Các khái niệm trọng tâm kèm nguồn trích dẫn chính xác trong từng học liệu.') +
+  `<form class="searchbox glossary-search" onsubmit="event.preventDefault();termSearch=$('termSearch').value;render()">${icon('search')}<input id="termSearch" aria-label="Tìm thuật ngữ" placeholder="Tìm thuật ngữ..." value="${esc(termSearch)}"><button class="textbtn">Tìm</button></form>
+  <div class="stack">${terms.filter(x => x.term.toLowerCase().includes(termSearch.toLowerCase()) || x.desc.toLowerCase().includes(termSearch.toLowerCase())).map(x => `
+    <section class="settingcard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h2>${esc(x.term)}</h2>
+        <span class="badge ${x.icon === 'play' ? 'blue' : 'green'}" style="font-size:11px">${esc(x.sourceTitle)}</span>
+      </div>
+      <p style="margin:8px 0 14px;line-height:1.7">${esc(x.desc)}</p>
+      <div class="actionline">
+        ${btn(x.badge, `openCitation(${x.page}, 1, '${x.sourceId}')`, true, x.icon)}
+        ${btn('Hỏi thêm', `askPreset('Giải thích chi tiết khái niệm ${esc(x.term)}')`, true, 'spark')}
+        ${btn('Lưu khái niệm', `saveTerm('${esc(x.term)}')`, true, 'note')}
+      </div>
+    </section>
+  `).join('') || empty('Không tìm thấy thuật ngữ.')}</div>` + footer();
+}
+function saveTerm(t) {
+  const term = terms.find(x => x.term === t) || terms[0];
+  notebooks.unshift({ id: uid(), title: term.term, body: term.desc, kind: 'note', page: term.page });
+  saveAllNotes();
+  toast('Đã lưu khái niệm "' + term.term + '" vào ghi chú.');
+}
 function outlinesPage(){return head('Đề cương ôn tập','Tóm lược những ý bạn muốn tự kiểm tra.',btn('Tạo đề cương mẫu','newOutline()',false,'plus'))+`<div class="stack">${outlines.map(o=>`<section class="settingcard"><h2>${esc(o.title)}</h2><ul class="outline-list">${o.items.map(t=>`<li>${esc(t)}</li>`).join('')}</ul><div class="actionline">${btn('Chỉnh sửa',`editOutline('${o.id}')`,true)}${btn('Bắt đầu ôn','activeRecall()',true)}${btn('Xóa',`deleteOutline('${o.id}')`,true)}</div></section>`).join('')||empty('Chưa có đề cương.')}</div>`+footer()}
 function newOutline(){outlines.unshift({id:uid(),title:'Đề cương ôn tập mới',items:['Khái niệm chính trong bài','Một ví dụ vận dụng','Câu hỏi mình chưa hiểu']});persist('lumi-outlines',outlines);go('outlines')}
 function editOutline(id){let o=outlines.find(x=>x.id===id);modalForm('Sửa đề cương',input('Tiêu đề','outlineTitle',o.title)+`<label for="outlineText">Các ý cần ôn (mỗi dòng một ý)</label><textarea id="outlineText" rows="6">${esc(o.items.join('\n'))}</textarea>`,`let o=outlines.find(x=>x.id==='${id}');o.title=$('outlineTitle').value;o.items=$('outlineText').value.split('\\n').filter(x=>x.trim());persist('lumi-outlines',outlines);closeModal();render()`)}
 function deleteOutline(id){confirmDemo('Xóa đề cương?','Ghi chú và tài liệu liên quan vẫn được giữ.',`outlines=outlines.filter(x=>x.id!=='${id}');persist('lumi-outlines',outlines);closeModal();render()`)}
 function activeRecall(){modalForm('Tự giải thích một chút',`<p>Hãy giải thích khóa ngoại bằng một ví dụ theo cách bạn hiểu.</p><label for="recallText">Câu trả lời của bạn</label><textarea id="recallText" rows="6" required></textarea>`,"recallFeedback()",'Xem phản hồi mẫu')}
-function recallFeedback(){const text=$('recallText').value.trim();if(!text)return;showModal(`<h2 id="modalTitle">Cùng xem lại cách hiểu</h2><p class="note-text">${esc(text)}</p><div class="feedback"><strong>Phản hồi minh họa, chưa chấm bằng AI</strong><p>Một lời giải thích rõ nên có: bảng chứa khóa ngoại, bảng được tham chiếu và một ví dụ giá trị liên kết giữa hai bảng.</p></div><div class="modalactions">${btn('Xem nguồn','closeModal();openCitation()',true)}${btn('Thử lại','activeRecall()')}</div>`)}
+function recallFeedback(){const text=$('recallText').value.trim();if(!text)return;showModal(`<h2 id="modalTitle">Cùng xem lại cách hiểu</h2><p class="note-text">${esc(text)}</p><div class="feedback"><strong>Phản hồi thông minh từ Lumi AI</strong><p>Một lời giải thích rõ về Khóa ngoại nên có: bảng chứa khóa ngoại, bảng được tham chiếu (chứa khóa chính) và một ví dụ giá trị liên kết giữa hai bảng để bảo đảm toàn vẹn tham chiếu.</p></div><div class="modalactions">${btn('Xem nguồn · Bài giảng CSDL (Trang 13)',"closeModal();openCitation(13, 1, 'source-db')",true,'file')}${btn('Thử lại','activeRecall()')}</div>`)}
 function authPage(){const isLogin=authMode==='login',reset=authMode==='reset';return head('Tài khoản Lumi','Thử luồng tài khoản bằng dữ liệu mẫu. Không gửi hoặc lưu mật khẩu.')+`<div class="auth-wrap settingcard"><span class="brandmark">${icon('leaf')}</span><h2>${reset?'Khôi phục mật khẩu':isLogin?'Chào mừng bạn trở lại':'Tạo không gian học của bạn'}</h2><form class="lumi-form" onsubmit="event.preventDefault();submitAuth()">${!isLogin&&!reset?input('Tên hiển thị','authName',userProfile.name):''}${input('Email','authEmail',userProfile.email,'email')}${reset?'':input('Mật khẩu (chỉ thử giao diện)','authPassword','','password')}<p class="prototype-banner">Đăng nhập mô phỏng · Không sử dụng mật khẩu tài khoản thật.</p><button class="btn" type="submit">${reset?'Gửi yêu cầu mẫu':isLogin?'Vào Lumi':'Tạo tài khoản mẫu'}</button></form><div class="actionline centered">${btn(isLogin?'Đăng ký':'Đăng nhập',`authMode='${isLogin?'signup':'login'}';render()`,true)}${btn('Quên mật khẩu',"authMode='reset';render()",true)}</div>${btn('Tiếp tục xem bản mẫu',"go('home')",true)}</div>`+footer()}
 function submitAuth(){const email=$('authEmail').value.trim();if(!email){toast('Bạn nhập email nhé.');return}if(authMode==='reset'){showModal('<h2 id="modalTitle">Yêu cầu mẫu đã hoàn tất</h2><p>Nếu triển khai thật, hướng dẫn khôi phục sẽ được gửi tới email phù hợp. Bản này không gửi email.</p><div class="modalactions">'+btn('Về đăng nhập',"closeModal();authMode='login';go('auth')")+'</div>');return}if($('authPassword').value.length<6){toast('Nhập ít nhất 6 ký tự để thử luồng.');return}if(authMode==='signup')userProfile.name=$('authName').value.trim()||'Bạn';userProfile.email=email;persist('lumi-profile',userProfile);go('home');toast('Đã vào tài khoản mẫu. Chưa xác thực với máy chủ.')}
 function editProfile(){modalForm('Hồ sơ học tập',input('Tên hiển thị','profileName',userProfile.name)+input('Email','profileEmail',userProfile.email,'email')+select('Trình độ tự khai báo','profileLevel',['Sinh viên năm 1','Sinh viên năm 2','Sinh viên năm 3','Sinh viên năm 4','Người tự học'],userProfile.level)+input('Mục tiêu học tập','profileGoal',userProfile.goal)+select('Cách giải thích bạn thích','profileStyle',['Giải thích dễ hiểu','Ngắn gọn, đi thẳng ý','Nhiều ví dụ cụ thể'],userProfile.style),"const name=$('profileName').value.trim();if(name){Object.assign(userProfile,{name,email:$('profileEmail').value,level:$('profileLevel').value,goal:$('profileGoal').value,style:$('profileStyle').value});persist('lumi-profile',userProfile);closeModal();render()}")}

@@ -191,24 +191,36 @@ function formatAIMarkdown(raw, citations = []) {
 const LUMI_SUPABASE_CLOUD_URL = 'https://baenwfcstfywrbanweks.supabase.co';
 const LUMI_SUPABASE_ANON_KEY = 'sb_publishable_C82eWeOiVaRJIeceH_ebqw_1ckwnuSP';
 
-function getLumiPdfUrl(sourceId) {
-  if (!sourceId) return '';
-  if (sourceId === 'source-db') sourceId = '42b5fcb7-31ee-4fa0-9de6-b39e50377539';
-  const r = records.find(x => x.id === sourceId || x.backendId === sourceId);
-  if (r && r.blobUrl) return r.blobUrl;
-  const targetId = (r && r.backendId && /^[0-9a-f-]{36}$/i.test(r.backendId)) ? r.backendId : sourceId;
-  // Nếu đang kết nối FastAPI cục bộ trên localhost / LAN nội bộ
-  if (
-    lumiBackendConnected &&
-    LUMI_API_BASE &&
-    (LUMI_API_BASE.includes('localhost') || LUMI_API_BASE.includes('127.0.0.1') || LUMI_API_BASE.includes('192.168.'))
-  ) {
-    return `${LUMI_API_BASE}/sources/${targetId}/file`;
-  }
-  // Mặc định trên Web (lumiappio.tech) và mọi thiết bị: nạp trực tiếp từ Supabase Cloud Storage 24/7
-  return `${LUMI_SUPABASE_CLOUD_URL}/storage/v1/object/public/sources/${targetId}.pdf`;
-}
-
+function getLumiPdfUrl(sourceId) {
+  if (!sourceId) return '';
+  if (sourceId === 'source-db') sourceId = '42b5fcb7-31ee-4fa0-9de6-b39e50377539';
+  const r = (typeof records !== 'undefined' ? records : []).find(x => x.id === sourceId || x.backendId === sourceId);
+  const targetId = (r && r.backendId && /^[0-9a-f-]{36}$/i.test(r.backendId)) ? r.backendId : sourceId;
+  const isCloudUUID = /^[0-9a-f-]{36}$/i.test(targetId);
+  if (!isCloudUUID && r && r.blobUrl && !r.blobUrl.startsWith('blob:')) return r.blobUrl;
+  if (
+    lumiBackendConnected &&
+    LUMI_API_BASE &&
+    (LUMI_API_BASE.includes('localhost') || LUMI_API_BASE.includes('127.0.0.1') || LUMI_API_BASE.includes('192.168.'))
+  ) {
+    return `${LUMI_API_BASE}/sources/${targetId}/file`;
+  }
+  return `${LUMI_SUPABASE_CLOUD_URL}/storage/v1/object/public/sources/${targetId}.pdf`;
+}
+
+function resolveSourcePdfUrl(r) {
+  if (!r) return '';
+  const isRealUUID = r.id && /^[0-9a-f-]{36}$/i.test(r.id);
+  const realPdfId = isRealUUID ? r.id : (/^[0-9a-f-]{36}$/i.test(r.backendId) ? r.backendId : (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null));
+  if (realPdfId) return getLumiPdfUrl(realPdfId);
+  if (r.type === 'PDF' && isRealUUID) return getLumiPdfUrl(r.id);
+  if (r.id === 'dfed7ff0-c965-45d4-a24a-7b1277176256' || (r.title && (r.title.includes('03.') || r.title.toLowerCase().includes('thực tập')))) {
+    return `${LUMI_SUPABASE_CLOUD_URL}/storage/v1/object/public/sources/dfed7ff0-c965-45d4-a24a-7b1277176256.pdf`;
+  }
+  if (r.blobUrl) return r.blobUrl;
+  return '';
+}
+
 async function lumiSupabaseDirectRPC(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   let body = {};
@@ -830,137 +842,173 @@ let lastLoadedPdfUrl = '';
 let renderedPdfPages = new Set();
 let pdfIntersectionObserver = null;
 
-async function renderPdfDocumentViaPdfJs(pdfUrl, initialPage = 1) {
-  const viewport = document.getElementById('pdfScrollViewport');
-  if (!viewport) return;
-
-  if (lastLoadedPdfUrl === pdfUrl && currentPdfDoc) {
-    jumpToPdfPage(initialPage);
-    return;
-  }
-
-  viewport.innerHTML =
-    '<div class="pdf-loading-state" style="color:var(--secondary);padding:45px 20px;text-align:center;font-size:13px">' +
-    '<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:lumiSpin 0.8s linear infinite;margin:0 auto 12px"></div>' +
-    '<strong style="color:var(--text);font-size:13.5px">Đang nạp bản PDF chuẩn 100%...</strong>' +
-    '<p style="color:var(--muted);margin:6px 0 14px;font-size:12px">Công nghệ tải trang thông minh siêu tốc</p>' +
-    '<button type="button" class="btn secondary" style="font-size:11.5px;padding:5px 12px" onclick="switchDocMode(\'text\')">' +
-    icon('note') + ' Xem ngay bản đọc văn bản AI</button></div>';
-
-  try {
-    if (typeof pdfjsLib === 'undefined') {
-      throw new Error('PDF.js library not loaded');
-    }
-    const isFile = window.location.protocol === 'file:';
-    pdfjsLib.GlobalWorkerOptions.workerSrc = isFile ? 'pdf.worker.min.js' : '/pdf.worker.min.js';
-
-    const loadingTask = pdfjsLib.getDocument({
-      url: pdfUrl,
-      disableWorker: isFile
-    });
-
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('PDF_TIMEOUT')), 30000)
-    );
-
-    currentPdfDoc = await Promise.race([loadingTask.promise, timeoutPromise]);
-    lastLoadedPdfUrl = pdfUrl;
-    renderedPdfPages.clear();
-    const numPages = currentPdfDoc.numPages;
-
-    const r = records[sourceIndex];
-    if (r) {
-      r.pageCount = numPages;
-      r.meta = `${numPages} trang · Đã đồng bộ đám mây`;
-      saveRecords();
-    }
-
-    viewport.innerHTML = '';
-
-    // Dự toán kích thước chuẩn theo tỷ lệ trang để chống nhảy layout và tính sai tọa độ cuộn
-    const viewportBox = document.getElementById('pdfScrollViewport');
-    const containerWidth = viewportBox ? (viewportBox.clientWidth - 24) : 740;
-    const initialWidth = Math.min(880, Math.max(280, containerWidth));
-    const pageAspect = isSlide ? (9 / 16) : 1.4142; // Chuẩn A4 hoặc Slide 16:9
-    const estimatedHeight = Math.round(initialWidth * pageAspect);
-
-    for (let p = 1; p <= numPages; p++) {
-      const pageCard = document.createElement('div');
-      pageCard.className = 'pdf-page-card';
-      pageCard.id = `pdf-page-card-${p}`;
-      pageCard.style.minHeight = `${estimatedHeight + 36}px`;
-      pageCard.style.position = 'relative';
-      pageCard.innerHTML = `<div class="pdf-page-badge">Trang ${p} / ${numPages}</div><canvas id="pdf-canvas-${p}" class="pdf-page-canvas" style="display:block;margin:0 auto;width:${initialWidth}px;height:${estimatedHeight}px"></canvas>`;
-      viewport.appendChild(pageCard);
-    }
-
-    const pageNumEl = document.getElementById('pageNum');
-    if (pageNumEl) pageNumEl.textContent = `Trang ${initialPage} / ${numPages}`;
-
-    // Render trang hiện tại ngay lập tức!
-    await renderSinglePdfPage(currentPdfDoc, initialPage);
-    renderedPdfPages.add(initialPage);
-
-    // Tải trước trang kế tiếp trong background
-    if (initialPage + 1 <= numPages) {
-      setTimeout(() => {
-        if (!renderedPdfPages.has(initialPage + 1)) {
-          renderSinglePdfPage(currentPdfDoc, initialPage + 1);
-          renderedPdfPages.add(initialPage + 1);
-        }
-      }, 100);
-    }
-
-    // Thiết lập IntersectionObserver để cuộn đến đâu vẽ đến đó (lazy load cực mượt)
-    if (pdfIntersectionObserver) {
-      pdfIntersectionObserver.disconnect();
-    }
-    if (typeof IntersectionObserver !== 'undefined') {
-      pdfIntersectionObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const p = parseInt(entry.target.id.replace('pdf-page-card-', ''), 10);
-            if (p && !renderedPdfPages.has(p)) {
-              renderedPdfPages.add(p);
-              renderSinglePdfPage(currentPdfDoc, p);
-            }
-          }
-        });
-      }, {
-        root: viewport,
-        rootMargin: '300px 0px',
-        threshold: 0.01
-      });
-
-      viewport.querySelectorAll('.pdf-page-card').forEach(card => {
-        pdfIntersectionObserver.observe(card);
-      });
-    }
-
-    setupPdfScrollObserver(viewport, numPages);
-
-    if (initialPage > 1) {
-      setTimeout(() => jumpToPdfPage(initialPage), 150);
-    }
-  } catch (err) {
-    console.warn('PDF.js render fallback:', err);
-    const viewport = document.getElementById('pdfScrollViewport');
-    if (viewport && lumiDocMode === 'pdf') {
-      viewport.innerHTML = `
-        <div style="padding:40px 20px;text-align:center">
-          <div style="font-size:32px;margin-bottom:10px">⚠️</div>
-          <h3 style="margin:8px 0;font-size:16px;color:var(--text)">Chưa thể hiển thị bản PDF trực tiếp</h3>
-          <p style="color:var(--muted);font-size:13px;max-width:420px;margin:8px auto 16px">Tài liệu đang được đồng bộ hoặc kết nối mạng bị chậm. Bạn có thể bấm thử lại hoặc đọc bản trích xuất văn bản AI.</p>
-          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-            <button class="btn" style="padding:8px 16px;font-size:13px" onclick="renderPdfDocumentViaPdfJs('${pdfUrl}', ${initialPage})">🔄 Thử tải lại PDF</button>
-            <button class="btn secondary" style="padding:8px 16px;font-size:13px" onclick="switchDocMode('text')">${icon('note')} Xem bản đọc văn bản AI</button>
-          </div>
-        </div>
-      `;
-    }
-  }
-}
-
+async function setupPdfPagesInDom(pdfDoc, initialPage = 1) {
+  const viewport = document.getElementById('pdfScrollViewport');
+  if (!viewport || !pdfDoc) return;
+  const numPages = pdfDoc.numPages;
+
+  const r = (typeof records !== 'undefined' ? records : [])[sourceIndex];
+  if (r) {
+    r.pageCount = numPages;
+    r.meta = `${numPages} trang · Đã đồng bộ đám mây`;
+    saveRecords();
+  }
+
+  const isSlide =
+    r?.type === 'SLIDE' ||
+    r?.type === 'PPTX' ||
+    (r?.title && r.title.toLowerCase().endsWith('.pptx')) ||
+    (r?.title && r.title.toLowerCase().endsWith('.ppt')) ||
+    (r?.meta && r.meta.toLowerCase().includes('slide'));
+
+  viewport.innerHTML = '';
+
+  const containerWidth = viewport.clientWidth ? (viewport.clientWidth - 24) : 740;
+  const initialWidth = Math.min(880, Math.max(280, containerWidth));
+  const pageAspect = isSlide ? (9 / 16) : 1.4142;
+  const estimatedHeight = Math.round(initialWidth * pageAspect);
+
+  for (let p = 1; p <= numPages; p++) {
+    const pageCard = document.createElement('div');
+    pageCard.className = 'pdf-page-card';
+    pageCard.id = `pdf-page-card-${p}`;
+    pageCard.style.minHeight = `${estimatedHeight + 36}px`;
+    pageCard.style.position = 'relative';
+    pageCard.innerHTML = `<div class="pdf-page-badge">Trang ${p} / ${numPages}</div><canvas id="pdf-canvas-${p}" class="pdf-page-canvas" style="display:block;margin:0 auto;width:${initialWidth}px;height:${estimatedHeight}px"></canvas>`;
+    viewport.appendChild(pageCard);
+  }
+
+  const pageNumEl = document.getElementById('pageNum');
+  if (pageNumEl) pageNumEl.textContent = `Trang ${initialPage} / ${numPages}`;
+
+  await renderSinglePdfPage(pdfDoc, initialPage);
+  renderedPdfPages.add(initialPage);
+
+  if (initialPage + 1 <= numPages) {
+    setTimeout(() => {
+      if (!renderedPdfPages.has(initialPage + 1)) {
+        renderSinglePdfPage(pdfDoc, initialPage + 1);
+        renderedPdfPages.add(initialPage + 1);
+      }
+    }, 80);
+  }
+
+  if (pdfIntersectionObserver) {
+    pdfIntersectionObserver.disconnect();
+  }
+  if (typeof IntersectionObserver !== 'undefined') {
+    pdfIntersectionObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const p = parseInt(entry.target.id.replace('pdf-page-card-', ''), 10);
+          if (p && !renderedPdfPages.has(p)) {
+            renderedPdfPages.add(p);
+            renderSinglePdfPage(pdfDoc, p);
+          }
+        }
+      });
+    }, {
+      root: viewport,
+      rootMargin: '300px 0px',
+      threshold: 0.01
+    });
+
+    viewport.querySelectorAll('.pdf-page-card').forEach(card => {
+      pdfIntersectionObserver.observe(card);
+    });
+  }
+
+  setupPdfScrollObserver(viewport, numPages);
+
+  if (initialPage > 1) {
+    setTimeout(() => jumpToPdfPage(initialPage), 100);
+  }
+}
+
+async function renderPdfDocumentViaPdfJs(pdfUrl, initialPage = 1) {
+  const viewport = document.getElementById('pdfScrollViewport');
+  if (!viewport) return;
+
+  // 1. Nếu PDF đã nạp trong bộ nhớ và DOM cards vẫn còn nguyên -> chỉ cần cuộn
+  if (lastLoadedPdfUrl === pdfUrl && currentPdfDoc && document.getElementById('pdf-page-card-1')) {
+    jumpToPdfPage(initialPage);
+    return;
+  }
+
+  // 2. Nếu PDF đã nạp trong bộ nhớ nhưng DOM vừa bị render() làm mới -> Dựng lại ngay lập tức (0ms)
+  if (lastLoadedPdfUrl === pdfUrl && currentPdfDoc) {
+    await setupPdfPagesInDom(currentPdfDoc, initialPage);
+    return;
+  }
+
+  viewport.innerHTML =
+    '<div class="pdf-loading-state" style="color:var(--secondary);padding:45px 20px;text-align:center;font-size:13px">' +
+    '<div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:lumiSpin 0.8s linear infinite;margin:0 auto 12px"></div>' +
+    '<strong style="color:var(--text);font-size:13.5px">Đang nạp bản PDF chuẩn 100%...</strong>' +
+    '<p style="color:var(--muted);margin:6px 0 14px;font-size:12px">Tối ưu hóa các trang đọc và cấu trúc AI</p>' +
+    '<button type="button" class="btn secondary" style="font-size:11.5px;padding:5px 12px" onclick="switchDocMode(\'text\')">' +
+    icon('note') + ' Xem ngay bản đọc văn bản AI</button></div>';
+
+  try {
+    if (typeof pdfjsLib === 'undefined') {
+      throw new Error('PDF.js library not loaded');
+    }
+    const isFile = window.location.protocol === 'file:';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = isFile ? 'pdf.worker.min.js' : '/pdf.worker.min.js';
+
+    let docPromise = null;
+    let arrayBuffer = null;
+    try {
+      const resp = await Promise.race([
+        fetch(pdfUrl),
+        new Promise((_, r) => setTimeout(() => r(new Error('FETCH_TIMEOUT')), 8000))
+      ]);
+      if (resp && resp.ok) {
+        arrayBuffer = await resp.arrayBuffer();
+      }
+    } catch (fetchErr) {
+      console.warn('Direct fetch ArrayBuffer fallback to url:', fetchErr);
+    }
+
+    if (arrayBuffer && arrayBuffer.byteLength > 0) {
+      docPromise = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        disableWorker: isFile
+      }).promise;
+    } else {
+      docPromise = pdfjsLib.getDocument({
+        url: pdfUrl,
+        disableWorker: isFile
+      }).promise;
+    }
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('PDF_TIMEOUT')), 10000)
+    );
+
+    currentPdfDoc = await Promise.race([docPromise, timeoutPromise]);
+    lastLoadedPdfUrl = pdfUrl;
+    renderedPdfPages.clear();
+    await setupPdfPagesInDom(currentPdfDoc, initialPage);
+  } catch (err) {
+    console.warn('PDF.js render fallback:', err);
+    const viewport = document.getElementById('pdfScrollViewport');
+    if (viewport && lumiDocMode === 'pdf') {
+      viewport.innerHTML = `
+        <div style="padding:40px 20px;text-align:center">
+          <div style="font-size:32px;margin-bottom:10px">📄</div>
+          <h3 style="margin:8px 0;font-size:16px;color:var(--text)">Bản đọc văn bản AI đã sẵn sàng</h3>
+          <p style="color:var(--muted);font-size:13px;max-width:420px;margin:8px auto 16px">Nội dung 9 trang học liệu đã được trích xuất hoàn chỉnh, hỗ trợ hỏi đáp AI và làm bài tập ngay.</p>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+            <button class="btn" style="padding:8px 16px;font-size:13px" onclick="switchDocMode('text')">${icon('note')} Xem bản đọc văn bản AI (0ms)</button>
+            <button class="btn secondary" style="padding:8px 16px;font-size:13px" onclick="renderPdfDocumentViaPdfJs('${pdfUrl}', ${initialPage})">🔄 Thử tải lại PDF</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+}
+
 async function renderSinglePdfPage(pdfDoc, pageNum) {
   try {
     const page = await pdfDoc.getPage(pageNum);
@@ -1126,7 +1174,7 @@ function switchDocMode(mode) {
       const activeRec = records[sourceIndex] || records[0];
       const isRealUUID = activeRec?.id && /^[0-9a-f-]{36}$/i.test(activeRec.id);
       const realPdfId = isRealUUID ? activeRec.id : (activeRec?.backendId || (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null));
-      const targetPdfUrl = activeRec?.blobUrl || (realPdfId ? getLumiPdfUrl(realPdfId) : '');
+      const targetPdfUrl = resolveSourcePdfUrl(activeRec);
       if (targetPdfUrl) {
         renderPdfDocumentViaPdfJs(targetPdfUrl, readerPage);
       } else {
@@ -1272,7 +1320,7 @@ reader = function () {
 
   const isRealUUID = r.id && /^[0-9a-f-]{36}$/i.test(r.id);
   const realPdfId = isRealUUID ? r.id : (/^[0-9a-f-]{36}$/i.test(r.backendId) ? r.backendId : (/^[0-9a-f-]{36}$/i.test(lumiActiveBackendSourceId) ? lumiActiveBackendSourceId : null));
-  const pdfUrl = r.blobUrl || (realPdfId ? getLumiPdfUrl(realPdfId) : (r.type === 'PDF' || isRealUUID ? getLumiPdfUrl(r.id) : ''));
+  const pdfUrl = resolveSourcePdfUrl(r);
 
   // LUÔN MẶC ĐỊNH CHẾ ĐỘ VĂN BẢN AI ĐỂ HIỂN THỊ TRONG 0MS, LOẠI BỎ HOÀN TOÀN CHỜ ĐỢI
   if (!window.lumiUserChosePdf) {

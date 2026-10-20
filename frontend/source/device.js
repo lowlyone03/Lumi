@@ -30,12 +30,8 @@
   // 2. Dọn dẹp cache cũ trong sessionStorage nếu trước đây từng bị lưu nhầm 'phone' trên web:
   try {
     if (!isNativeApk) {
-      if (sessionStorage.getItem('lumi-device') === 'phone') {
-        sessionStorage.removeItem('lumi-device');
-      }
-      if (sessionStorage.getItem('lumi-device-mode') === 'mobile' && !forcedDevice) {
-        sessionStorage.removeItem('lumi-device-mode');
-      }
+      sessionStorage.removeItem('lumi-device');
+      sessionStorage.removeItem('lumi-device-mode');
     }
   } catch {}
 

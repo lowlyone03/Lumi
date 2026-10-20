@@ -887,6 +887,195 @@ html[data-theme="dark"] [data-device="phone"] .main::-webkit-scrollbar-thumb {
   display: none !important;
 }
 
+/* ==========================================================================
+ * RESPONSIVE SIDEBAR: TỰ ĐỘNG THÍCH ỨNG FULL 100% TRÊN MỌI KÍCH THƯỚC MÀN HÌNH
+ * - Không bao giờ bị khuyết cạnh dưới (profile, avatar, logout) ở tỷ lệ 100%.
+ * - Khi phóng to trình duyệt > 100% (Ctrl +): tự động kích hoạt thanh cuộn siêu
+ *   mảnh, mượt mà để xem trọn vẹn nội dung mà không vỡ bố cục.
+ * ========================================================================== */
+.app:not(.mobile) .sidebar,
+.sidebar {
+  position: sticky !important;
+  top: 0 !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain !important;
+  padding: clamp(10px, 1.8vh, 22px) clamp(10px, 1vw, 16px) !important;
+  gap: clamp(6px, 1.2vh, 16px) !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent !important;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 4px !important;
+}
+.sidebar::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15) !important;
+  border-radius: 4px !important;
+}
+html[data-theme="dark"] .sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
+.sidebar .brand {
+  flex-shrink: 0 !important;
+  font-size: clamp(18px, 2.2vh, 22px) !important;
+  gap: 8px !important;
+}
+.sidebar .brandmark {
+  width: clamp(28px, 3.2vh, 34px) !important;
+  height: clamp(28px, 3.2vh, 34px) !important;
+  border-radius: 9px !important;
+  flex-shrink: 0 !important;
+}
+.sidebar .brandmark svg {
+  width: clamp(18px, 2vh, 22px) !important;
+  height: clamp(18px, 2vh, 22px) !important;
+}
+
+.sidebar nav {
+  display: flex !important;
+  flex-direction: column !important;
+  flex-shrink: 0 !important;
+}
+
+.sidebar .navlabel {
+  font-size: 9px !important;
+  letter-spacing: 1.2px !important;
+  margin: 0 8px clamp(3px, 0.5vh, 6px) !important;
+  flex-shrink: 0 !important;
+}
+
+.sidebar .navitem {
+  padding: clamp(5px, 0.9vh, 9px) 11px !important;
+  margin: 1px 0 !important;
+  font-size: clamp(12px, 1.3vh, 13px) !important;
+  border-radius: 8px !important;
+  gap: 9px !important;
+}
+.sidebar .navitem svg {
+  width: clamp(16px, 1.8vh, 18px) !important;
+  height: clamp(16px, 1.8vh, 18px) !important;
+  flex-shrink: 0 !important;
+}
+
+.sidebar .sidesub {
+  padding: clamp(3px, 0.5vh, 6px) 11px !important;
+  font-size: clamp(11px, 1.2vh, 12px) !important;
+  gap: 8px !important;
+}
+
+.sidebar .sidebottom {
+  margin-top: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: clamp(4px, 0.8vh, 10px) !important;
+  flex-shrink: 0 !important;
+  padding-top: clamp(4px, 0.6vh, 8px) !important;
+}
+
+.sidebar .quiet-card {
+  padding: clamp(6px, 1vh, 12px) 10px !important;
+  font-size: clamp(9.5px, 1.1vh, 11px) !important;
+  line-height: 1.4 !important;
+  border-radius: 9px !important;
+}
+.sidebar .quiet-card strong {
+  font-size: clamp(10.5px, 1.2vh, 11.5px) !important;
+  margin: 2px 0 !important;
+}
+.sidebar .quiet-card svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.sidebar .profile {
+  margin-top: 0 !important;
+  padding-top: clamp(5px, 0.8vh, 10px) !important;
+  border-top: 1px solid var(--border, var(--line)) !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  text-align: left !important;
+  flex-shrink: 0 !important;
+}
+.sidebar .avatar {
+  width: clamp(28px, 3.2vh, 34px) !important;
+  height: clamp(28px, 3.2vh, 34px) !important;
+  min-width: clamp(28px, 3.2vh, 34px) !important;
+  font-size: clamp(10px, 1.1vh, 11.5px) !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+}
+.sidebar .profile strong {
+  font-size: clamp(11px, 1.2vh, 12px) !important;
+}
+.sidebar .profile small {
+  font-size: 9.5px !important;
+}
+
+.sidebar .l-app-footer {
+  margin-top: clamp(2px, 0.4vh, 6px) !important;
+  padding-top: 2px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  font-size: 9px !important;
+  flex-shrink: 0 !important;
+}
+.sidebar .l-app-footer button {
+  font-size: 9px !important;
+  padding: 2px 4px !important;
+}
+
+/* Các ngưỡng màn hình laptop ngắn / tỷ lệ co nhỏ */
+@media (max-height: 760px) {
+  .sidebar {
+    gap: 6px !important;
+    padding: 8px 12px !important;
+  }
+  .sidebar .quiet-card {
+    padding: 5px 8px !important;
+    font-size: 9.5px !important;
+    line-height: 1.3 !important;
+  }
+  .sidebar .quiet-card br {
+    display: none !important;
+  }
+}
+
+@media (max-height: 670px) {
+  /* Màn hình laptop ngắn (< 670px) hoặc khi có thanh công cụ trình duyệt / Windows taskbar:
+     Ẩn thẻ khuyên nhủ tĩnh (.quiet-card) để đảm bảo Profile và Nút Đăng Xuất luôn hiển thị 100% trọn vẹn */
+  .sidebar .quiet-card {
+    display: none !important;
+  }
+  .sidebar {
+    padding: 6px 10px !important;
+    gap: 4px !important;
+  }
+  .sidebar .navitem {
+    padding: 4px 8px !important;
+  }
+  .sidebar .sidesub {
+    padding: 2px 8px !important;
+  }
+  .sidebar .profile {
+    padding-top: 4px !important;
+  }
+}
+
+
 
 
 

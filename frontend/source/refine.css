@@ -1252,3 +1252,92 @@ html[data-theme="dark"] .app:not(.mobile) .sidebar::-webkit-scrollbar-thumb {
   transition: transform 0.06s ease-out;
 }
 
+/* ==========================================================================
+   THÔNG BÁO TOAST NỔI Ở ĐẦU GIAO DIỆN (TOP FLOATING TOAST)
+   ========================================================================== */
+@keyframes lumiToastSlideDown {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -24px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+#toast[hidden],
+.toast[hidden] {
+  display: none !important;
+}
+
+#toast,
+.toast {
+  position: fixed !important;
+  top: 18px !important;
+  bottom: auto !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 999999 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 10px 22px !important;
+  border-radius: 999px !important;
+  background: #18362b !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25), 0 3px 10px rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  max-width: min(92vw, 460px) !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  animation: lumiToastSlideDown 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+/* Khi có thanh previewbar phía trên (chế độ xem trước trên máy tính) */
+.previewbar ~ #toast,
+body:has(.previewbar) #toast {
+  top: 72px !important;
+}
+
+html[data-theme="dark"] #toast,
+html[data-theme="dark"] .toast {
+  background: #1e2c24 !important;
+  color: #ebf7f1 !important;
+  border: 1px solid #3d614e !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5) !important;
+}
+
+html[data-theme="comfort"] #toast,
+html[data-theme="comfort"] .toast {
+  background: #2b3e34 !important;
+  color: #f7faf8 !important;
+  border: 1px solid #486354 !important;
+}
+
+@media (max-width: 600px) {
+  #toast,
+  .toast {
+    top: max(16px, env(safe-area-inset-top, 16px)) !important;
+    max-width: calc(100% - 32px) !important;
+    border-radius: 16px !important;
+    padding: 11px 18px !important;
+  }
+}
+
+html[data-device="phone"] #toast,
+html[data-device="phone"] .toast {
+  top: max(16px, env(safe-area-inset-top, 16px)) !important;
+  max-width: calc(100% - 32px) !important;
+  border-radius: 16px !important;
+}
+
+

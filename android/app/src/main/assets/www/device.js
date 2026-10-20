@@ -54,21 +54,12 @@
 
   if (typeof setMode === 'function') setMode('mobile');
 
-  // Trên Native APK: Chưa có phiên → mở 3 màn chào của app mobile
+  // Trên Native APK: Chưa có phiên và chưa chọn trang nào -> mở màn chào onboarding
   const hash = location.hash.slice(1).split('?')[0];
   const hasSession = typeof lumiSession === 'function' && lumiSession();
-  if (!hasSession && (!hash || hash === 'landing') && typeof go === 'function') {
+  if (!hasSession && !hash && typeof go === 'function') {
     go('mobile');
   } else if (typeof render === 'function') {
     render();
-  }
-
-  // Trên Native APK: Nút quay về trang giới thiệu sẽ dẫn tới màn chào app
-  if (typeof go === 'function') {
-    const goBeforeDevice = go;
-    go = function (p) {
-      if (p === 'landing' && !(typeof lumiSession === 'function' && lumiSession())) p = 'mobile';
-      return goBeforeDevice(p);
-    };
   }
 })();

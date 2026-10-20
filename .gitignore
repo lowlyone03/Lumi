@@ -62,3 +62,7 @@ backend/real_pytest_output.txt
 backend/b4_test_results.txt
 backend/report_*.xml
 *.log
+
+# Temporary PDF uploads in frontend & assets
+frontend/source/*.pdf
+android/app/src/main/assets/www/*.pdf

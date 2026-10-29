@@ -1,7 +1,10 @@
 """Security headers and browser CORS for Lumi.
 
-The public site is also configured in kltn/vercel.json. Keep the CSP in sync
-when changing either place. CORS is never `*` and is only attached to /api.
+The public site Vercel publishes is frontend/source
+(frontend/source/vercel.json). vercel.json at the git root has the same
+headers, with rewrites under /frontend/source, and is not read while Root
+Directory stays frontend/source. Keep the CSP in sync when changing either
+place. CORS is never `*` and is only attached to /api.
 """
 import re
 

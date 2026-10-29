@@ -38,7 +38,7 @@
       ]
     },
     {
-      "source": "/(home|library|personal|reader|hub|history|review|flashcards|planner|focus|stats|glossary|outlines|auth|login|signup|video|source|notes|course|quiz)",
+      "source": "/(home|library|personal|reader|hub|history|review|flashcards|planner|focus|stats|glossary|outlines|auth|login|signup|video|source|notes|course|quiz|preview|START-HERE)",
       "headers": [
         { "key": "Cache-Control", "value": "no-store" },
         { "key": "Pragma", "value": "no-cache" },
@@ -49,7 +49,7 @@
   "rewrites": [
     {
       "source": "/",
-      "destination": "/frontend/source/home.html"
+      "destination": "/frontend/source/index.html"
     },
     {
       "source": "/home",

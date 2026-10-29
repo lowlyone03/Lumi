@@ -66,3 +66,5 @@ backend/report_*.xml
 # Temporary PDF uploads in frontend & assets
 frontend/source/*.pdf
 android/app/src/main/assets/www/*.pdf
+
+.vercel

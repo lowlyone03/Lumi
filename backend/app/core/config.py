@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8000
     DEBUG: bool = True
+    # Danh sách origin trình duyệt được gọi API, phân tách bằng dấu phẩy.
+    # Không dùng "*". Trang cùng origin không cần CORS.
+    CORS_ORIGINS: str = "https://www.lumiappio.tech,https://lumiappio.tech"
 
     # Supabase Cloud Credentials
     SUPABASE_URL: str = Field(default="https://baenwfcstfywrbanweks.supabase.co")
@@ -75,5 +78,9 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.APP_ENV.lower() == "production"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [item.strip() for item in self.CORS_ORIGINS.split(",") if item.strip()]
 
 settings = Settings()

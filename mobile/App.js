@@ -2,8 +2,11 @@ import React, { useRef, useState, useEffect } from 'react';
 import { StyleSheet, SafeAreaView, StatusBar, BackHandler, Platform, View, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-// Địa chỉ máy chủ FastAPI (thay bằng IP LAN laptop của bạn khi test trên cùng Wi-Fi)
-const SERVER_URL = 'http://192.168.39.17:8000/app/?device=phone';
+// Mặc định mở site công khai. Khi thử máy local, đặt EXPO_PUBLIC_LUMI_URL
+// trong môi trường máy dev — không ghi địa chỉ mạng nội bộ vào mã nguồn.
+const SERVER_URL =
+  (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_LUMI_URL) ||
+  'https://www.lumiappio.tech/?device=phone';
 
 export default function App() {
   const webViewRef = useRef(null);

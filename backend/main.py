@@ -1,15 +1,20 @@
 import logging
+import mimetypes
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.database import engine, AsyncSessionLocal
+from app.core.security_headers import (
+    allowed_cors_origin,
+    apply_api_cors,
+    apply_security_headers,
+)
 from app.core.exceptions import (
     StudyFlowException,
     studyflow_exception_handler,
@@ -24,6 +29,11 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("lumi.main")
+
+# Windows không luôn đăng ký các kiểu này. PDF.js và font tự host cần đúng MIME.
+mimetypes.add_type("text/javascript", ".mjs", strict=True)
+mimetypes.add_type("application/wasm", ".wasm", strict=True)
+mimetypes.add_type("font/woff2", ".woff2", strict=True)
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 FRONTEND_SOURCE_DIR = FRONTEND_DIR / "source"
@@ -64,22 +74,25 @@ def create_application() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Middleware CORS hỗ trợ Web, Desktop & React Native Expo
-    application.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
     @application.middleware("http")
-    async def add_no_cache_for_app_assets(request, call_next):
+    async def security_headers_middleware(request: Request, call_next):
+        """Header bảo mật cho mọi response. CORS chỉ trên /api, không dùng *."""
+        origin = allowed_cors_origin(
+            request.headers.get("origin"),
+            configured=settings.cors_origin_list,
+            production=settings.is_production,
+        )
+        if request.method == "OPTIONS" and request.url.path.startswith("/api"):
+            response = Response(status_code=204 if origin else 403)
+            apply_security_headers(response, request)
+            if origin:
+                apply_api_cors(response, origin)
+            return response
+
         response = await call_next(request)
-        if request.url.path.startswith("/app"):
-            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
+        apply_security_headers(response, request)
+        if origin and request.url.path.startswith("/api"):
+            apply_api_cors(response, origin)
         return response
 
     # Đăng ký Exception Handlers toàn cục
